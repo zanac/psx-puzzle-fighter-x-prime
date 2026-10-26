@@ -1,0 +1,14 @@
+# game images and anything extracted from them
+*.pbp
+*.bin
+*.cue
+*.iso
+*.7z
+*.7z.*
+work/
+# emulator checkout / build
+emu/pcsx_rearmed/
+# experiment output
+*.state
+shots/
+__pycache__/

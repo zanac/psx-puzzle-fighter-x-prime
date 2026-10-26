@@ -1,0 +1,226 @@
+diff --git a/Makefile b/Makefile
+index d637914..a0ef44e 100644
+--- a/Makefile
++++ b/Makefile
+@@ -91,7 +91,7 @@ OBJS += libpcsxcore/cdriso.o libpcsxcore/cdrom.o libpcsxcore/cdrom-async.o \
+ 	libpcsxcore/decode_xa.o libpcsxcore/mdec.o \
+ 	libpcsxcore/misc.o libpcsxcore/plugins.o libpcsxcore/ppf.o libpcsxcore/psxbios.o \
+ 	libpcsxcore/psxcommon.o libpcsxcore/psxcounters.o libpcsxcore/psxdma.o \
+-	libpcsxcore/psxhw.o libpcsxcore/psxinterpreter.o libpcsxcore/psxmem.o \
++	libpcsxcore/psxhw.o libpcsxcore/psxinterpreter.o libpcsxcore/psxmem.o libpcsxcore/xdbg.o \
+ 	libpcsxcore/psxevents.o libpcsxcore/r3000a.o \
+ 	libpcsxcore/sio.o libpcsxcore/spu.o libpcsxcore/gpu.o \
+ 	libpcsxcore/pad.o
+diff --git a/frontend/libretro-version-script b/frontend/libretro-version-script
+index b0c262d..3c97094 100644
+--- a/frontend/libretro-version-script
++++ b/frontend/libretro-version-script
+@@ -1,5 +1,6 @@
+ {
+    global: retro_*;
++    xdbg_*;
+    local: *;
+ };
+ 
+diff --git a/libpcsxcore/psxinterpreter.c b/libpcsxcore/psxinterpreter.c
+index 900c0cd..4da03cd 100644
+--- a/libpcsxcore/psxinterpreter.c
++++ b/libpcsxcore/psxinterpreter.c
+@@ -27,6 +27,7 @@
+ #include "gte.h"
+ #include "psxhle.h"
+ #include "psxinterpreter.h"
++#include "xdbg.h"
+ #include <stddef.h>
+ #include <assert.h>
+ #include "../include/compiler_features.h"
+@@ -1171,6 +1172,8 @@ static inline void execI_(
+ 	addCycle(regs);
+ 	dloadStep(regs);
+ 
++	if (xdbg_active)
++		xdbg_exec(pc);
+ 	regs->pc += 4;
+ 	regs->code = fetch(regs, memRLUT, pc);
+ 	psxBSC[regs->code >> 26](regs, regs->code);
+diff --git a/libpcsxcore/psxmem.c b/libpcsxcore/psxmem.c
+index a81dcaa..368a838 100644
+--- a/libpcsxcore/psxmem.c
++++ b/libpcsxcore/psxmem.c
+@@ -1,3 +1,4 @@
++#include "xdbg.h"
+ /***************************************************************************
+  *   Copyright (C) 2007 Ryan Schultz, PCSX-df Team, PCSX team              *
+  *                                                                         *
+@@ -356,6 +357,7 @@ void psxMemOnIsolate(int enable)
+ u8 psxMemRead8(psxRegisters *regs, u32 mem) {
+ 	u8 *p;
+ 	u32 t;
++	if (xdbg_active) xdbg_mem(2, regs->pc - 4, mem, 0, 1);
+ 
+ 	if (likely(psxm_(&p, regs, mem, 0)))
+ 		return *p;
+@@ -373,6 +375,7 @@ u8 psxMemRead8(psxRegisters *regs, u32 mem) {
+ u16 psxMemRead16(psxRegisters *regs, u32 mem) {
+ 	u8 *p;
+ 	u32 t;
++	if (xdbg_active) xdbg_mem(2, regs->pc - 4, mem, 0, 2);
+ 
+ 	if (likely(psxm_(&p, regs, mem, 0)))
+ 		return SWAPu16(*(u16 *)p);
+@@ -390,6 +393,7 @@ u16 psxMemRead16(psxRegisters *regs, u32 mem) {
+ u32 psxMemRead32(psxRegisters *regs, u32 mem) {
+ 	u8 *p;
+ 	u32 t;
++	if (xdbg_active) xdbg_mem(2, regs->pc - 4, mem, 0, 4);
+ 
+ 	if (likely(psxm_(&p, regs, mem, 0)))
+ 		return SWAPu32(*(u32 *)p);
+@@ -409,6 +413,7 @@ u32 psxMemRead32(psxRegisters *regs, u32 mem) {
+ void psxMemWrite8(psxRegisters *regs, u32 mem, u32 value) {
+ 	u8 *p;
+ 	u32 t;
++	if (xdbg_active) xdbg_mem(1, regs->pc - 4, mem, value, 1);
+ 
+ 	if (likely(psxm_(&p, regs, mem, 1))) {
+ 		*p = value;
+@@ -432,6 +437,7 @@ void psxMemWrite8(psxRegisters *regs, u32 mem, u32 value) {
+ void psxMemWrite16(psxRegisters *regs, u32 mem, u32 value) {
+ 	u8 *p;
+ 	u32 t;
++	if (xdbg_active) xdbg_mem(1, regs->pc - 4, mem, value, 2);
+ 
+ 	if (likely(psxm_(&p, regs, mem, 1))) {
+ 		*(u16 *)p = SWAPu16(value);
+@@ -455,6 +461,7 @@ void psxMemWrite16(psxRegisters *regs, u32 mem, u32 value) {
+ void psxMemWrite32(psxRegisters *regs, u32 mem, u32 value) {
+ 	u8 *p;
+ 	u32 t;
++	if (xdbg_active) xdbg_mem(1, regs->pc - 4, mem, value, 4);
+ 
+ 	if (likely(psxm_(&p, regs, mem, 1))) {
+ 		*(u32 *)p = SWAPu32(value);
+diff --git a/libpcsxcore/xdbg.c b/libpcsxcore/xdbg.c
+new file mode 100644
+index 0000000..8c2a84c
+--- /dev/null
++++ b/libpcsxcore/xdbg.c
+@@ -0,0 +1,79 @@
++#include <stdlib.h>
++#include <string.h>
++#include "xdbg.h"
++#include "r3000a.h"
++
++#define EXPORT __attribute__((visibility("default")))
++
++int xdbg_active;
++uint32_t xdbg_frame;
++xdbg_watch xdbg_watches[XDBG_MAX_WATCH];
++int xdbg_nwatch;
++uint32_t xdbg_bps[XDBG_MAX_BP];
++int xdbg_nbp;
++uint32_t *xdbg_cov;
++uint32_t xdbg_cov_lo, xdbg_cov_hi;
++
++static xdbg_entry logbuf[XDBG_LOG_MAX];
++static uint32_t lognum;
++
++static void push(uint32_t kind, uint32_t pc, uint32_t addr, uint32_t value, uint32_t size)
++{
++	xdbg_entry *e;
++	if (lognum >= XDBG_LOG_MAX)
++		return;
++	e = &logbuf[lognum++];
++	e->kind = kind; e->pc = pc; e->ra = psxRegs.GPR.n.ra;
++	e->addr = addr; e->value = value; e->size = size; e->frame = xdbg_frame;
++	memcpy(e->gpr, psxRegs.GPR.r, sizeof(e->gpr));
++}
++
++void xdbg_mem(int kind, uint32_t pc, uint32_t addr, uint32_t value, uint32_t size)
++{
++	int i;
++	uint32_t a = addr & 0x1fffff;
++	if ((addr & 0x0fffffff) >= 0x00800000) return;
++	for (i = 0; i < xdbg_nwatch; i++) {
++		xdbg_watch *w = &xdbg_watches[i];
++		if ((w->kind & kind) && a + size > w->lo && a < w->hi) {
++			push(kind, pc, addr, value, size);
++			return;
++		}
++	}
++}
++
++void xdbg_exec(uint32_t pc)
++{
++	int i;
++	if (xdbg_cov && pc >= xdbg_cov_lo && pc < xdbg_cov_hi)
++		xdbg_cov[(pc - xdbg_cov_lo) >> 2]++;
++	for (i = 0; i < xdbg_nbp; i++)
++		if (xdbg_bps[i] == pc) { push(3, pc, 0, 0, 0); return; }
++}
++
++/* ---- ctypes API ---- */
++EXPORT void xdbg_set_active(int on) { xdbg_active = on; }
++EXPORT void xdbg_clear(void) { xdbg_nwatch = 0; xdbg_nbp = 0; lognum = 0; }
++EXPORT void xdbg_clear_log(void) { lognum = 0; }
++EXPORT int xdbg_add_watch(uint32_t lo, uint32_t hi, uint32_t kind)
++{
++	if (xdbg_nwatch >= XDBG_MAX_WATCH) return -1;
++	xdbg_watches[xdbg_nwatch].lo = lo & 0x1fffff;
++	xdbg_watches[xdbg_nwatch].hi = ((hi - 1) & 0x1fffff) + 1;
++	xdbg_watches[xdbg_nwatch].kind = kind;
++	return xdbg_nwatch++;
++}
++EXPORT int xdbg_add_bp(uint32_t pc) { if (xdbg_nbp >= XDBG_MAX_BP) return -1; xdbg_bps[xdbg_nbp++] = pc; return 0; }
++EXPORT uint32_t xdbg_log_count(void) { return lognum; }
++EXPORT xdbg_entry *xdbg_log(void) { return logbuf; }
++EXPORT void xdbg_set_frame(uint32_t f) { xdbg_frame = f; }
++EXPORT uint32_t *xdbg_cov_enable(uint32_t lo, uint32_t hi)
++{
++	free(xdbg_cov);
++	xdbg_cov_lo = lo; xdbg_cov_hi = hi;
++	xdbg_cov = calloc((hi - lo) / 4, 4);
++	return xdbg_cov;
++}
++EXPORT void xdbg_cov_disable(void) { free(xdbg_cov); xdbg_cov = NULL; }
++EXPORT uint32_t *xdbg_regs(void) { return psxRegs.GPR.r; }
++EXPORT uint32_t xdbg_pc(void) { return psxRegs.pc; }
+diff --git a/libpcsxcore/xdbg.h b/libpcsxcore/xdbg.h
+new file mode 100644
+index 0000000..72abba8
+--- /dev/null
++++ b/libpcsxcore/xdbg.h
+@@ -0,0 +1,33 @@
++/* Minimal research hooks (interpreter only): memory watchpoints,
++ * exec breakpoints that snapshot registers, and a PC coverage map. */
++#ifndef XDBG_H
++#define XDBG_H
++#include <stdint.h>
++
++#define XDBG_LOG_MAX 65536
++#define XDBG_MAX_WATCH 16
++#define XDBG_MAX_BP 32
++
++typedef struct {
++	uint32_t kind;      /* 1=write 2=read 3=exec */
++	uint32_t pc, ra, addr, value, size, frame;
++	uint32_t gpr[32];
++} xdbg_entry;
++
++typedef struct {
++	uint32_t lo, hi, kind; /* kind bitmask: 1 write, 2 read */
++} xdbg_watch;
++
++extern int xdbg_active;
++extern uint32_t xdbg_frame;
++extern xdbg_watch xdbg_watches[XDBG_MAX_WATCH];
++extern int xdbg_nwatch;
++extern uint32_t xdbg_bps[XDBG_MAX_BP];
++extern int xdbg_nbp;
++extern uint32_t *xdbg_cov;       /* hit counts for cov_lo..cov_hi (word granular) */
++extern uint32_t xdbg_cov_lo, xdbg_cov_hi;
++
++void xdbg_mem(int kind, uint32_t pc, uint32_t addr, uint32_t value, uint32_t size);
++void xdbg_exec(uint32_t pc);
++
++#endif
