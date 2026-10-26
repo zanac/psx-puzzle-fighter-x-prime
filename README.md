@@ -15,6 +15,7 @@ compiled C rather than 68k assembly, so every change is rewritten from scratch.
 - Diamond always sends 80 % ("diamond trick" removed)
 - Mei-Ling and Anita count as Hsien-Ko and Donovan (no +25 %); the Versus Difficulty 1-5 handicap stays as in vanilla
 - Devilot, Akuma and Dan selectable without codes
+- **PSX X' addition — Dan:** new "Gadoken" drop pattern (red spine: columns 1/3/5 red, mixed pairs between) instead of all red; sends 110 % and receives 110 %
 - `X'` marker in game
 
 ## Status
@@ -48,6 +49,9 @@ Needs `python3` and [armips](https://github.com/Kingcom/armips).
 On the character select screen, move to the bottom row and keep pressing
 **Down**: the character on that cell cycles through Devilot, Akuma, Dan,
 Mei-Ling and Anita, then back. Up, Left or Right return to the normal grid.
+As in vanilla, the button used to confirm picks the colours: Circle or
+Triangle give the standard colours, Cross or Square the alternate ones.
+
 Mei-Ling and Anita keep Hsien-Ko's and Donovan's portrait on the select
 screen, with their own name label; they appear as themselves in the match.
 

@@ -52,6 +52,9 @@ PATTERNS equ 0x8016E684
 .org PATTERNS + 7 * 0xC0            ; Sakura
 	pattern4 3,4,4,4,4,2, 3,1,1,1,1,2, 2,4,4,4,4,3, 2,1,1,1,1,3
 
+.org PATTERNS + 10 * 0xC0           ; Dan (PSX X' addition, "Gadoken": red spine)
+	pattern4 4,2,4,3,4,1, 4,2,4,3,4,1, 4,1,4,2,4,3, 4,1,4,2,4,3
+
 ; ============================================================================
 ; DAMAGE TABLES  (replace the vanilla margin/level tables, same 0x50 bytes,
 ; same layout as the arcade X' patch at CPS2 0x10110)
@@ -66,11 +69,11 @@ DMGTAB equ 0x8016E5F4
 	; +0x10 receive rate /20, indexed by the receiving player's character
 	;       (looked up through the attacker's opponent pointer +0x84)
 	;        Mor  Chun Ryu  Ken  Hsien Don  Fel  Sak  Devi Akuma Dan
-	.byte    20,  20,  20,  20,  20,   20,  20,  20,  20,  24,   20,  20, 20, 20, 20, 20
+	.byte    20,  20,  20,  20,  20,   20,  20,  20,  20,  24,   22,  20, 20, 20, 20, 20
 	; +0x20 margin time numerators /10
 	.halfword 10, 11, 12, 13, 14, 15, 16, 17
 	; +0x30 send rate /20, indexed by own character
-	.byte    20,  24,  20,  20,  20,   20,  20,  20,  17,  20,   20,  20, 20, 20, 20, 20
+	.byte    20,  24,  20,  20,  20,   20,  20,  20,  17,  20,   22,  20, 20, 20, 20, 20
 	; +0x40 damage level numerators /10 (option 0..3)
 	.halfword 8, 10, 13, 15, 15, 15, 15, 15
 .endarea
