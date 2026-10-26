@@ -14,6 +14,8 @@ MARKER_ROW   equ 26
 MARKER_PAL   equ 5
 TITLE_COL    equ 15                     ; "X' BALANCE PATCH" on the title, under the copyright
 TITLE_ROW    equ 28
+MODE         equ 0x8019C40F             ; game mode of the match (3 = Versus)
+MODE_NEXT    equ 0x8019C3FF             ; mode being set up (on the select screen)
 
 ; ============================================================================
 ; DROP PATTERNS  (table at 0x8016E684, 11 chars x 0xC0, rows bottom first)
@@ -411,8 +413,8 @@ xp_move:
 ; skipped and both places hold new code.
 ; ============================================================================
 .org 0x8013AA60
-	b       0x8013AACC              ; skip the secret-code detectors
-	nop
+	j       xp_stagekey             ; skip the secret-code detectors; the
+	nop                             ; Versus stage line runs here instead
 .area 0x8013AACC - 0x8013AA68, 0
 
 ; ---- title screen line, after the vanilla "TM" print (0x80126C40) ----
@@ -420,6 +422,8 @@ xp_move:
 ; the print routine (0x80107CB8) nor its callees use
 xp_title:
 	move    t8, ra
+	lui     t0, hi(xp_stg_setting)  ; back on the title: stage = NORMAL
+	sb      zero, lo(xp_stg_setting)(t0)
 	jal     0x80107CB8              ; vanilla print (a0..a2 untouched)
 	nop
 	li      a0, TITLE_COL
@@ -515,6 +519,8 @@ xp_marker_clear:
 	nop
 	jal     xp_marker_set
 	move    t3, zero
+	jal     xp_stage_erase          ; Versus stage line (t0-t3 only)
+	nop
 	jr      t8
 	nop
 .endarea
@@ -541,5 +547,9 @@ xp_marker_clear:
 .org 0x80126C40
 	jal     xp_title                ; title screen text
 
+.org 0x8012CCE0
+	jal     xp_stage                ; stage index (vanilla: lbu v0, 0x68(s2))
+
+.include "src/stage.asm"
 
 .close

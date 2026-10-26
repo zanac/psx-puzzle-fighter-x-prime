@@ -52,6 +52,19 @@ Done:
 
 See [docs/RESEARCH.md](docs/RESEARCH.md) for the map of the PSX executable.
 
+## Experimental: Versus stage selector
+
+On this branch, the Versus character select shows a stage line under the grid.
+Press **SELECT** (either player, before confirming) to cycle through:
+
+`NORMAL → RANDOM → MORRIGAN → CHUN-LI → RYU → KEN → HSIEN-KO → DONOVAN → FELICIA → SAKURA → DEVILOT → AKUMA`
+
+- NORMAL is the vanilla behaviour: the stage of P1's character.
+- RANDOM picks a new stage at every match and never repeats the previous one. The stage brings its own music.
+- The choice is kept from match to match until you go back to the title screen.
+
+![Stage line on the select screen](docs/screenshots/stage_select.png)
+
 ## Download and patching
 
 Get the zip from [Releases](https://github.com/zanac/psx-puzzle-fighter-x-prime/releases). It contains no game data. You need your own **Super Puzzle Fighter II Turbo, NTSC-U, SLUS-00418** image (single-track BIN or PBP) and Python 3; nothing else.

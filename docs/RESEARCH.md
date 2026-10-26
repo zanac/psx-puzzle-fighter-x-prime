@@ -210,6 +210,24 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 
 **Versus RESULT screen.** Rows for Devilot/Akuma/Dan appear once their "used" globals are set, which the confirm hook does. Mei-Ling/Anita count as Hsien-Ko/Donovan, as in vanilla.
 
+## 7b. Versus stage selector (experimental branch)
+
+**Vanilla.**
+- `0x8012CCE0`: `stage = player[s2].char` (P1 in Versus), stored as a halfword at `0x8019FC98`. It runs once per match, not per round.
+- `0x80107944` loads the stage when it differs from the cached one (`0x801BF114`): `table[stage]` at `0x80166728` (11 entries; Dan, 10, shares Ken's function). Two more 11-entry tables follow at `0x80166754` and `0x80166780`.
+- Stage files: `DATA/STAGE00..09.EMI`, file ids `0x4A + n` in the LBA table at `0x80165CC0`.
+- The match music follows the stage, not the characters.
+- Mode bytes: `0x8019C3FF` is the mode being set up (3 = Versus on the select screen), `0x8019C40F` the mode of the running match.
+- Pads: pressed this frame at `0x801BF09E` (P1) / `0x801BF0AA` (P2), held at `0x801BF09C`; SELECT = `0x0100`.
+- RESULT screen cursor: `0x8019C3DA` (0 CONTINUE, 1 END, 2 CLEAR RESULT).
+
+**Patch (`src/stage.asm`).**
+- Line `< STAGE: name >` at col 14, row 27, palette 5, Versus select only. It is drawn by the select handler (the old secret-code call block at `0x8013AA60` jumps to `xp_stagekey`) and erased on scene init with the X' marker.
+- SELECT, from either player still choosing, cycles NORMAL → RANDOM → MORRIGAN … AKUMA.
+- `xp_stage` replaces the `lbu` at `0x8012CCE0`. In a Versus match, NORMAL keeps vanilla, a fixed setting n gives stage n-2, and RANDOM draws one of the 10 stages. The draw uses an LCG stirred with root counters 0 and 1, excluding the stage of the previous match.
+- `xp_title` resets the setting to NORMAL.
+- The code and its variables live at `0x801544E4`, a 996-byte function with no references (no `jal`, no pointer, no `lui`/`addiu` pair). Emulator coverage never reached it.
+
 ## 8. Design decisions
 
 1. **Secret characters:** Down on the bottom row cycles the cell's character through Devilot → Akuma → Dan → Mei-Ling → Anita → cell character. The cursor stays on the visible cell. Confirmation reuses the vanilla secret-code path, so all the vanilla side effects happen.
@@ -219,3 +237,4 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 5. **Bosses:** the `+0x6C` flag is irrelevant under X' (no Devilot/Akuma penalty any more).
 6. **Branding:** X' marker in matches, "X' BALANCE PATCH" on the title.
 7. **Mei-Ling / Anita labels** on the select screen (redrawn unused Japanese labels).
+8. **Versus stage (experimental):** the selector starts at NORMAL. The choice is kept between matches until the title screen comes back. RANDOM never repeats the stage of the previous match.

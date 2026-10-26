@@ -1,6 +1,8 @@
 # Proposal: stage selector for Versus (random or fixed)
 
-Branch: `experimental/random-stage`. Status: **proposal, not implemented yet.**
+Branch: `experimental/random-stage`. Status: **implemented (proposal A)**, see `src/stage.asm`.
+
+Decisions taken: proposal A. The setting starts at NORMAL and keeps the last choice between matches, until the title screen comes back. RANDOM never gives the same stage twice in a row.
 
 ## What the user asked
 
@@ -40,14 +42,15 @@ emulator, same font and palette as the in-match `X'` marker.)
   `NORMAL → RANDOM → MORRIGAN → CHUN-LI → RYU → KEN → HSIEN-KO → DONOVAN →
   FELICIA → SAKURA → DEVILOT → AKUMA → NORMAL`.
   A short menu sound on each press.
-- `NORMAL` = vanilla (stage of P1's character).
-- `RANDOM` = one of the 10 stages, drawn again **at every match**.
+- `NORMAL` = vanilla (stage of P1's character). Default.
+- `RANDOM` = one of the 10 stages, drawn again **at every match**, never
+  the stage of the previous match.
   Seed: the PSX hardware root counter mixed with the frame counter, so it
   depends on when the players press the buttons (good enough, no fixed
   sequence).
 - Fixed stage = that stage every match.
-- The setting is kept until power off / reset (it is not saved to the
-  memory card).
+- The setting is kept from match to match and goes back to `NORMAL` when
+  the title screen comes back (it is not saved to the memory card).
 - Arcade, Street Puzzle and demo are **not** touched.
 
 Implementation sketch (small):
@@ -72,9 +75,16 @@ flexible: no way back to vanilla, no way to pick a stage.
 but the menu code is not mapped yet: much more work and risk for the same
 result as A.
 
-## Open questions
+## Result
 
-1. A, B or C? (Recommended: A.)
-2. Default setting: `NORMAL` (vanilla until you press SELECT) or `RANDOM`?
-3. `RANDOM`: avoid the same stage twice in a row? Dan's slot (= Ken's
-   stage) is not in the list, as it is not a separate stage.
+![Stage line on the select screen](screenshots/stage_select.png)
+
+![RANDOM over four matches](screenshots/stage_random.png)
+
+Tested in the emulator:
+- Every setting gives the expected stage index.
+- RANDOM over 8 matches in a row gave 7, 1, 6, 5, 7, 1, 4, 0, with no stage repeated back to back.
+- The setting survives CONTINUE and is back to NORMAL after END and the title.
+- The line is erased on the VS screen and in matches, where the X' marker is intact.
+- The Arcade select has no line, and the Arcade stages are vanilla.
+- The full regression passes: damage fuzz 150/150, select, Arcade with Devilot, Street Puzzle and demo.
