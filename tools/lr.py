@@ -77,6 +77,7 @@ class Emu:
         self._audiob = AUDIOB_CB(lambda d, n: n)
         self._poll = POLL_CB(lambda: None)
         self._state = STATE_CB(self._state_cb)
+        self._logf = LOG_CB(lambda lvl, fmt: print('[core]', fmt.decode(errors='replace').rstrip()) if (verbose or lvl >= 2) else None)
         L = self.lib
         L.retro_set_environment(self._env)
         L.retro_set_video_refresh(self._video)
@@ -96,6 +97,8 @@ class Emu:
         L.xdbg_cov_enable.restype = C.POINTER(C.c_uint32)
         L.xdbg_regs.restype = C.POINTER(C.c_uint32)
         L.xdbg_pc.restype = C.c_uint32
+        L.xdbg_snap.restype = C.POINTER(C.c_uint8)
+        self._snaplen = 0
         self.ram_ptr = L.retro_get_memory_data(2)
         self.ram_size = L.retro_get_memory_size(2)
 
@@ -119,6 +122,9 @@ class Emu:
             return True
         if cmd == ENV_GET_VARIABLE_UPDATE:
             C.cast(data, C.POINTER(C.c_bool))[0] = False
+            return True
+        if cmd == ENV_GET_LOG_INTERFACE:
+            C.cast(data, C.POINTER(C.c_void_p))[0] = C.cast(self._logf, C.c_void_p).value
             return True
         if cmd == ENV_GET_CAN_DUPE:
             C.cast(data, C.POINTER(C.c_bool))[0] = True
@@ -186,6 +192,11 @@ class Emu:
     def rbytes(self, a, n):
         return C.string_at(self.ram_ptr + self._a(a), n)
 
+    def vram(self):
+        """Raw VRAM, 1024x512 halfwords (needs the patched core's xdbg_vram)."""
+        self.lib.xdbg_vram.restype = C.c_void_p
+        return C.string_at(self.lib.xdbg_vram(), 1024 * 512 * 2)
+
     # ---- states ----
     def save_state(self, path=None):
         n = self.lib.retro_serialize_size()
@@ -218,10 +229,16 @@ class Emu:
     def watch(self, lo, hi, kind=1):
         return self.lib.xdbg_add_watch(C.c_uint32(lo), C.c_uint32(hi), C.c_uint32(kind))
 
+    def snap(self, addr, n):
+        """Capture n bytes at addr whenever a breakpoint hits (max 4 ranges, 4 KiB)."""
+        self._snaplen += n
+        return self.lib.xdbg_add_snap(C.c_uint32(addr), C.c_uint32(n))
+
     def bp(self, pc):
         return self.lib.xdbg_add_bp(C.c_uint32(pc))
 
     def dbg_clear(self):
+        self._snaplen = 0
         self.lib.xdbg_clear()
 
     def log(self, clear=True):
@@ -230,8 +247,11 @@ class Emu:
         out = []
         for i in range(n):
             e = p[i]
-            out.append(dict(kind=e.kind, pc=e.pc, ra=e.ra, addr=e.addr, value=e.value,
-                            size=e.size, frame=e.frame, gpr=list(e.gpr)))
+            ent = dict(kind=e.kind, pc=e.pc, ra=e.ra, addr=e.addr, value=e.value,
+                       size=e.size, frame=e.frame, gpr=list(e.gpr))
+            if e.kind == 3 and self._snaplen:
+                ent['snap'] = C.string_at(self.lib.xdbg_snap(e.size), self._snaplen)
+            out.append(ent)
         if clear:
             self.lib.xdbg_clear_log()
         return out
