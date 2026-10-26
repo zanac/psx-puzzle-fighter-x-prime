@@ -52,7 +52,22 @@ Done:
 
 See [docs/RESEARCH.md](docs/RESEARCH.md) for the map of the PSX executable.
 
-## Building
+## Download and patching
+
+Get the zip from [Releases](https://github.com/zanac/psx-puzzle-fighter-x-prime/releases). It contains no game data. You need your own **Super Puzzle Fighter II Turbo, NTSC-U, SLUS-00418** image (single-track BIN or PBP) and Python 3; nothing else.
+
+```sh
+./patch.sh original.bin  xprime.bin      # or
+./patch.sh original.pbp  xprime.pbp
+python3 tools/applypatch.py xprime-patch.json original.bin xprime.bin   # same, any OS
+```
+
+The output keeps the input's format. For BIN output, copy the original `.cue` and point its FILE line at the new `.bin`.
+
+The patcher checks the SHA-1 of every file it changes, before and after, so a different version or a modified image is rejected.
+Tested on PCSX ReARMed; reports from other emulators or real hardware are welcome.
+
+## Building from source
 
 ```sh
 ./build.sh original.pbp  xprime.pbp  [path/to/armips]
@@ -83,6 +98,9 @@ screen, with their own name label; they appear as themselves in the match.
 | `tools/pbp2bin.py` | PSX PBP (PSISOIMG) → BIN/CUE |
 | `tools/psxiso.py` | list / extract the ISO9660 file system of a raw BIN |
 | `tools/findpat.py` | scan a file for drop-pattern-shaped tables |
+| `patch.sh`, `tools/applypatch.py` | apply `xprime-patch.json` (no assembler needed) |
+| `tools/mkpatch.py` | create `xprime-patch.json` from an original and a built image |
+| `tools/nav.py` | menu navigation helpers for the emulator tests |
 | `tools/discpatch.py` | replace files in a BIN or PBP (EDC/ECC, PBP rebuild) |
 | `tools/previews.py` | redraw the Counter Gem previews from the EXE table |
 | `tools/lzh.py` | codec for the sprite-graphics LZ (decoder `0x8010D5C0`) |

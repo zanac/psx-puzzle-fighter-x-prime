@@ -1,14 +1,22 @@
 import sys,random,struct,json; sys.path.insert(0, __import__('os').path.dirname(__import__('os').path.abspath(__file__)))
 from nav import *
 from model import xprime
-img=sys.argv[1]; out=sys.argv[2]
+"""End-to-end regression: title, select (secret cycle), damage fuzz against
+model.py, match end + RESULT, Arcade with Devilot, Street Puzzle, demo.
+
+usage: regress.py IMAGE.(pbp|cue) OUTDIR
+Writes screenshots, savestates and result.json into OUTDIR."""
+import os
+img=sys.argv[1]; OUT=sys.argv[2]; os.makedirs(OUT, exist_ok=True)
+out=os.path.join(OUT,'result.json')
+def P_(n): return os.path.join(OUT,n)
 e=lr.Emu(img)
 P=[]; R={}
-def sh(n): p='/home/claude/work/shots/rg_%s.png'%n; e.shot(p); P.append(p)
+def sh(n): p=P_('rg_%s.png'%n); e.shot(p); P.append(p)
 e.run(1200); e.press(lr.START,4,120); sh('title')
-e.press(lr.START,4,120); e.save_state('/home/claude/work/st_rg_menu.bin')
+e.press(lr.START,4,120); e.save_state(P_('st_menu.state'))
 e.press(lr.DOWN,8,30); e.press(lr.DOWN,8,30); e.press(lr.CROSS,6,200); e.press(lr.START,6,100,port=1); e.run(200)
-e.save_state('/home/claude/work/st_rg_sel.bin')
+e.save_state(P_('st_sel.state'))
 for i in range(5): e.press(lr.DOWN,4,30)              # P1 Ryu->Morrigan->...->Mei-Ling
 for i in range(6): e.press(lr.DOWN,4,30,port=1)      # P2 Ken->Felicia->...->Anita
 R['sel']=(e.r8(0x801baac4),e.r8(0x801baac8),e.r8(0x801ae4d8),e.r8(0x801ae4d9))
@@ -46,7 +54,7 @@ sh('result')
 for k in range(2): e.run(90); e.press(lr.CROSS,4,20)
 sh('back_select')
 # arcade with Devilot
-e.load_state('/home/claude/work/st_rg_menu.bin')
+e.load_state(P_('st_menu.state'))
 e.press(lr.CROSS,6,200); e.press(lr.CROSS,6,200)
 e.press(lr.DOWN,4,30); e.press(lr.DOWN,4,30); e.press(lr.CROSS,6,30)
 for i in range(6): e.run(120); e.press(lr.CROSS,4,4)
@@ -57,12 +65,12 @@ for k in range(30):
     if k==20: sh('arcade_next')
 sh('arcade_late')
 # street puzzle
-e.load_state('/home/claude/work/st_rg_menu.bin')
+e.load_state(P_('st_menu.state'))
 e.press(lr.DOWN,8,30); e.press(lr.CROSS,6,250); e.press(lr.CROSS,6,400); e.run(300); sh('street')
 # training demo
-e.load_state('/home/claude/work/st_rg_menu.bin')
+e.load_state(P_('st_menu.state'))
 for i in range(3): e.press(lr.DOWN,8,25)
 e.press(lr.CROSS,6,1200); sh('demo')
 json.dump({'R':R,'P':P},open(out,'w'))
-grid(e,P[:6],'/home/claude/work/shots/rg1.png'); grid(e,P[6:],'/home/claude/work/shots/rg2.png')
+grid(e,P[:6],P_('grid1.png')); grid(e,P[6:],P_('grid2.png'))
 print(R)
