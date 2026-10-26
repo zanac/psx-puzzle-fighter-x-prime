@@ -74,7 +74,9 @@ class Emu:
         self._env = ENV_CB(self._env_cb)
         self._video = VIDEO_CB(self._video_cb)
         self._audio = AUDIO_CB(lambda l, r: None)
-        self._audiob = AUDIOB_CB(lambda d, n: n)
+        self.audio = bytearray()
+        self.capture_audio = False
+        self._audiob = AUDIOB_CB(self._audio_cb)
         self._poll = POLL_CB(lambda: None)
         self._state = STATE_CB(self._state_cb)
         self._logf = LOG_CB(lambda lvl, fmt: print('[core]', fmt.decode(errors='replace').rstrip()) if (verbose or lvl >= 2) else None)
@@ -130,6 +132,11 @@ class Emu:
             C.cast(data, C.POINTER(C.c_bool))[0] = True
             return True
         return False
+
+    def _audio_cb(self, data, frames):
+        if self.capture_audio and data:
+            self.audio += C.string_at(data, frames * 4)   # stereo int16
+        return frames
 
     def _video_cb(self, data, w, h, pitch):
         if data:

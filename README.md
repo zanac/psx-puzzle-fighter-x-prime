@@ -18,6 +18,27 @@ compiled C rather than 68k assembly, so every change is rewritten from scratch.
 - **PSX X' addition — Dan:** new "Gadoken" drop pattern (red spine: columns 1/3/5 red, mixed pairs between) instead of all red; sends 110 % and receives 110 %
 - `X'` marker in game
 
+## Screenshots
+
+**Title screen.** "X' BALANCE PATCH" is shown under the copyright.
+
+![Title screen](docs/screenshots/title.png)
+
+**Secret characters without codes.** On the bottom row, Down cycles the cell through Devilot → Akuma → Dan → Mei-Ling → Anita and back.
+Mei-Ling and Anita get their own name labels, which the original select screen never had.
+
+![Secret character cycle](docs/screenshots/select_cycle.png)
+
+![Mei-Ling vs Anita on the select screen](docs/screenshots/select_meiling_anita.png)
+
+**New drop patterns.** Counter Gem previews, vanilla (top) vs X' (bottom), generated from the game's own pattern tables.
+
+![Counter Gem patterns, vanilla vs X'](docs/screenshots/counter_gems.png)
+
+**In game.** `X'` sits between the win counters, as in the arcade patch.
+
+![Match with the X' marker](docs/screenshots/match.png)
+
 ## Status
 
 Done:
