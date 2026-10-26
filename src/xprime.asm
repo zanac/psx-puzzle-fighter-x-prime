@@ -186,6 +186,27 @@ xp_mulfrac:
 @@ret:
 	jr      ra
 	nop
+
+; ---- character select confirm hook (see CHARACTER SELECT below) ----
+; In: a0 = secret code result (0 none, 1..3), s0 = select struct.
+; If no code was entered but the cursor already shows Devilot/Akuma/Dan
+; (8..10, reached by cycling), take the vanilla secret-character path with
+; a0 = char - 7, which also sets the per-secret "used" globals.
+xp_confirm:
+	bnez    a0, @@secret            ; code entered: vanilla, v1 = a0 + 7
+	nop
+	lb      v1, 0x74(s0)
+	nop
+	slti    v0, v1, 8
+	bnez    v0, @@normal
+	nop
+	addiu   a0, v1, -7
+@@secret:
+	j       0x8013AB88
+	nop
+@@normal:
+	j       0x8013AC18
+	nop
 .endarea
 
 ; ============================================================================
@@ -201,5 +222,154 @@ xp_mulfrac:
 
 .org 0x8012FCDC
 	sb      v0, 0x23F(s0)           ; bottom diamond: set penalty flag (v0 = 1)
+
+; ============================================================================
+; CHARACTER SELECT
+; Pressing Down while on the bottom row cycles the character on that cell:
+;   cell char -> Devilot -> Akuma -> Dan -> Mei-Ling -> Anita -> cell char
+; The cursor stays on the visible cell (there is no screen room for a third
+; row). Up/Left/Right behave as in vanilla and restore the cell's character.
+; Mei-Ling / Anita are Hsien-Ko / Donovan (4 / 5) plus the player's bit in
+; 0x801AE4D8 / 0x801AE4D9, exactly what the vanilla code entry produces.
+; ============================================================================
+
+CURSOR_CHARS equ 0x8016F6E4             ; cursor position -> character
+ALT_BITS     equ 0x801AE4D8             ; +0 Mei-Ling bits, +1 Anita bits
+
+; cursor badge ("1P"/"2P"): vanilla hides it when the character is >= 8;
+; keep it on the cell while a secret character is shown there
+.org 0x80115FB8
+	sltiu   v0, v0, 11                  ; P1
+.org 0x80115FC8
+	sltiu   v0, v0, 11                  ; P2
+
+; confirm: let cycled Devilot/Akuma/Dan go through the secret-code path
+.org 0x8013AB80
+	j       xp_confirm
+	addiu   v1, a0, 7                   ; (vanilla delay slot)
+
+; cursor movement (vanilla 0x8013AD30), a0 = select struct, a1 = pad,
+; a2 = cursor struct (+0 character, +1 position 0..7)
+.org 0x8013AD30
+.area 0x8013AEC8 - 0x8013AD30, 0
+xp_move:
+	addiu   sp, sp, -0x18
+	sw      s0, 0x10(sp)
+	sw      ra, 0x14(sp)
+	andi    v0, a1, 0xF000
+	beqz    v0, @@ret
+	move    s0, a0
+	lbu     t0, 1(a2)                   ; cursor position
+	lb      t4, 0x73(s0)                ; player index
+	li      t5, 1
+	sllv    t5, t5, t4                  ; t5 = this player's alt bit
+	nor     t6, t5, zero                ; t6 = ~bit
+	lui     t4, hi(ALT_BITS)
+	lbu     t7, lo(ALT_BITS)(t4)        ; Mei-Ling bits
+	lbu     t8, lo(ALT_BITS + 1)(t4)    ; Anita bits
+	move    t3, zero                    ; bit to set in Mei-Ling bits
+	move    t9, zero                    ; bit to set in Anita bits
+	andi    a1, a1, 0xFFFF
+	li      v0, 0x1000                  ; up
+	beq     a1, v0, @@updown
+	addiu   t1, t0, -4
+	li      v0, 0x8000                  ; left
+	beq     a1, v0, @@leftright
+	addiu   t1, t0, -1
+	li      v0, 0x2000                  ; right
+	beq     a1, v0, @@leftright
+	addiu   t1, t0, 1
+	li      v0, 0x4000                  ; down
+	bne     a1, v0, @@ret
+	addiu   t1, t0, 4
+	sltiu   v0, t0, 4
+	bnez    v0, @@updown                ; top row: plain move down
+	nop
+
+	; Down on the bottom row: cycle the character of this cell
+	lbu     t2, 0(a2)
+	li      v0, 10
+	bne     t2, v0, @@not_dan
+	slti    v0, t2, 8
+	li      t2, 4                       ; Dan -> Mei-Ling
+	b       @@apply
+	move    t3, t5
+@@not_dan:
+	bnez    v0, @@not_secret
+	li      v0, 4
+	b       @@apply
+	addiu   t2, t2, 1                   ; Devilot -> Akuma -> Dan
+@@not_secret:
+	bne     t2, v0, @@not_meiling
+	and     v1, t7, t5
+	beqz    v1, @@not_meiling
+	nop
+	li      t2, 5                       ; Mei-Ling -> Anita
+	b       @@apply
+	move    t9, t5
+@@not_meiling:
+	li      v0, 5
+	bne     t2, v0, @@to_devilot
+	and     v1, t8, t5
+	bnez    v1, @@cell_char             ; Anita -> cell character
+	nop
+@@to_devilot:
+	b       @@apply
+	li      t2, 8                       ; cell character -> Devilot
+
+@@leftright:                            ; stay on the same row
+	srl     v0, t1, 2
+	srl     v1, t0, 2
+	bne     v0, v1, @@ret
+	nop
+	b       @@moved
+	nop
+@@updown:
+	sltiu   v0, t1, 8
+	beqz    v0, @@ret
+	nop
+@@moved:
+	sb      t1, 1(a2)
+	move    t0, t1
+@@cell_char:                            ; t0 = cursor position
+	la      v0, CURSOR_CHARS
+	addu    v0, v0, t0
+	lbu     t2, 0(v0)
+
+@@apply:                                ; t2 = character, t3/t9 = alt bit to set
+	and     t7, t7, t6
+	or      t7, t7, t3
+	and     t8, t8, t6
+	or      t8, t8, t9
+	sb      t7, lo(ALT_BITS)(t4)
+	sb      t8, lo(ALT_BITS + 1)(t4)
+	sb      t2, 0x74(s0)
+	sb      t2, 0(a2)
+	li      a0, 0xD                     ; cursor sound
+	move    a1, zero
+	jal     0x80105C88
+	lb      a2, 0x73(s0)
+	move    a0, s0                      ; character animation
+	jal     0x80136400
+	li      a1, 0x17
+	lb      a0, 0x73(s0)                ; portrait / name
+	lb      a1, 0x74(s0)
+	lui     a2, 0x801B
+	bnez    a0, @@p2
+	nop
+	b       @@portrait
+	lb      a2, -0x1A93(a2)             ; P1 +0x6D (0x801AE56D)
+@@p2:
+	lb      a2, -0x17E7(a2)             ; P2 +0x6D (0x801AE819)
+@@portrait:
+	nop                                 ; load delay
+	jal     0x8010789C
+	nop
+@@ret:
+	lw      ra, 0x14(sp)
+	lw      s0, 0x10(sp)
+	jr      ra
+	addiu   sp, sp, 0x18
+.endarea
 
 .close

@@ -165,7 +165,16 @@ top branch as well.
 - Input bits: `0x1000` up (−4), `0x4000` down (+4), `0x8000` left (−1), `0x2000` right (+1).
 - The cursor is kept in 0..7, and moving left/right between 3 and 4 is blocked.
 - After a move, the code writes the character from the `0x8016F6E4` table to `+0x74` and to `0x801BAAC4`, plays SE `0x17`, and clears the Mei-Ling/Anita bits.
-- **The Counter Gem preview is rendered from the drop pattern table.** Forcing characters 8/9/10 shows the Devilot/Akuma/Dan patterns. No graphics work is needed for previews, unlike the arcade hack.
+- **The Counter Gem preview is pre-drawn art, not generated from the table.**
+  It is a 4bpp texture page at VRAM (640,0), CLUT (0,491), stored raw in
+  `DATA/FIRST.EMI` and `DATA/FIRSTE.EMI` (identical files) at offset `0x9D800`, 128 bytes per row.
+  Each character has a 36×24 preview drawn as 5×3 8×8 sprites. Origins (u,v) are char×40 on rows v=96 (0–4) and v=120 (5–9), and Dan is at (72,152).
+  Each gem is 6×6 pixels: border 1, shine D, light/dark 4/5 blue, 8/9 yellow, 6/7 green, 2/3 red.
+  The top preview row is pattern row 4. The original Devilot art has rows 2/4 swapped versus its table.
+  `tools/previews.py` regenerates previews from the EXE table.
+- The "1P/2P" cursor badge (`0x80115F9C`) is drawn only when the character is < 8.
+- Confirming (`0x8013AB04`): secret code results → a0 = 1/2/3 → character 8/9/10. The path writes `+0x74`, `0x801BAAC4/8` and the game struct `+0x68`, and sets the "secret used" globals `0x801BE050` (Devilot), `0x8019FE84` (Akuma) and `0x801BF120` (Dan). Mei-Ling/Anita codes only set the alt bit (`1 << player`).
+- The select screen has no portrait or name art for Mei-Ling/Anita (the name strip has the vanilla names only); the alternates appear in the match.
 - There is **no screen space for a third row**. Positions ≥ 8 make the cursor disappear, and the grid already touches the bottom edge.
 - Vanilla PSX secret access: codes on Morrigan/Felicia, or, after clearing Street Puzzle, L1 (Akuma), R1 (Devilot) or L1+R1 (Dan) while confirming.
 
@@ -176,13 +185,11 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 
 ---
 
-## 7. Open design decisions
+## 7. Design decisions
 
-1. **Akuma/Devilot/Dan access.** The arcade solution (third row) has no room on screen. Candidates:
-   - unlock the L1/R1/L1+R1 shortcuts from the start;
-   - make the grid wrap ("down" from the bottom row cycles to the hidden characters, keeping the cursor on a visible cell);
-   - redraw the grid.
-2. **Mei-Ling / Anita.** These are PSX-only and get +25 % in vanilla. X' doesn't define them. Options: keep them as in vanilla, or treat them like Hsien-Ko/Donovan.
-3. **Handicap in Versus.** Ignore it in the formula (like X'), and optionally skip the Difficulty 1-5 selector.
-4. **Branding.** X' marker in matches and on the title screen, drawn with the PSX sprite/text system.
-5. **Bosses.** In vanilla `+0x6C` exempts Devilot/Akuma from their penalty. Under X' their send rates replace that penalty, so the flag becomes irrelevant.
+1. **Secret characters:** Down on the bottom row cycles the cell's character through Devilot → Akuma → Dan → Mei-Ling → Anita → cell character. The cursor stays on the visible cell. Confirmation reuses the vanilla secret-code path, so all the vanilla side effects happen.
+2. **Mei-Ling / Anita** count as Hsien-Ko / Donovan: no +25 %, same patterns and rates.
+3. **Versus handicap** (Difficulty 1-5) is kept, with vanilla behaviour: `x += floor(x/10) * (diff + 1)` when the opponent's level is higher.
+4. **Free play** is not applicable on console.
+5. **Bosses:** the `+0x6C` flag is irrelevant under X' (no Devilot/Akuma penalty any more).
+6. **Branding** (X' marker in matches and on the title screen) is still to do.

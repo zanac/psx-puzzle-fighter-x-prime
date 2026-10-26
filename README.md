@@ -19,9 +19,39 @@ compiled C rather than 68k assembly, so every change is rewritten from scratch.
 
 ## Status
 
-Research phase. See [docs/RESEARCH.md](docs/RESEARCH.md) for the full map of the
-PSX executable (player struct, damage routine, diamond logic, character select,
-tables) and the open design decisions.
+Done:
+
+- **Drop patterns.** New patterns for the five characters, including the Counter Gem previews on the select screen.
+- **Damage formula.** It reproduces the arcade X' patch exactly. It was fuzz-tested in an emulator against a Python model of the arcade code.
+- **Diamond.** It always applies its penalty, so the diamond trick is gone.
+- **Character select.** Pressing Down on the bottom row cycles through Devilot, Akuma, Dan, Mei-Ling and Anita.
+
+To do:
+
+- `X'` marker in game and on the title screen
+
+See [docs/RESEARCH.md](docs/RESEARCH.md) for the map of the PSX executable.
+
+## Building
+
+```sh
+./build.sh original.pbp  xprime.pbp  [path/to/armips]
+./build.sh original.bin  xprime.bin  [path/to/armips]
+```
+
+The input must be the original NTSC-U SLUS-00418; the script checks the
+executable's hash. The output has the same format as the input. For BIN
+output, reuse the original `.cue` and rename the file inside it if needed.
+
+Needs `python3` and [armips](https://github.com/Kingcom/armips).
+
+## How to play the secret characters
+
+On the character select screen, move to the bottom row and keep pressing
+**Down**: the character on that cell cycles through Devilot, Akuma, Dan,
+Mei-Ling and Anita, then back. Up, Left or Right return to the normal grid.
+The select screen has no art for Mei-Ling and Anita, so they appear there as
+Hsien-Ko and Donovan; they show up as themselves in the match.
 
 ## Tools
 
@@ -30,6 +60,9 @@ tables) and the open design decisions.
 | `tools/pbp2bin.py` | PSX PBP (PSISOIMG) → BIN/CUE |
 | `tools/psxiso.py` | list / extract the ISO9660 file system of a raw BIN |
 | `tools/findpat.py` | scan a file for drop-pattern-shaped tables |
+| `tools/discpatch.py` | replace files in a BIN or PBP (EDC/ECC, PBP rebuild) |
+| `tools/previews.py` | redraw the Counter Gem previews from the EXE table |
+| `tools/model.py` | Python model of the arcade X' damage formula (for tests) |
 | `tools/lr.py` | headless libretro frontend (input scripting, RAM access, savestates, screenshots, watchpoints) |
 | `emu/build.sh` | builds an instrumented pcsx_rearmed libretro core (`emu/pcsx_rearmed-xdbg.patch`) |
 
