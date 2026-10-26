@@ -13,7 +13,7 @@ compiled C rather than 68k assembly, so every change is rewritten from scratch.
 - New drop patterns for Morrigan, Ryu, Hsien-Ko, Felicia and Sakura
 - Garbage: Chun-Li sends 120 %, Devilot 85 %, Akuma 100 % but receives 120 %
 - Diamond always sends 80 % ("diamond trick" removed)
-- No handicap
+- Mei-Ling and Anita count as Hsien-Ko and Donovan (no +25 %); the Versus Difficulty 1-5 handicap stays as in vanilla
 - Devilot, Akuma and Dan selectable without codes
 - `X'` marker in game
 
