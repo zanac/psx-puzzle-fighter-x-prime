@@ -185,11 +185,37 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 
 ---
 
-## 7. Design decisions
+## 7. Name labels, text layer, X' markers
+
+**Name labels (select screen).** Each player has a label object: P1 at `0x801BE5A8`, P2 at `+0x150`.
+- Every frame, `0x80116438` (P1) and `0x8011649C` (P2) compare the select character with `+0x58` and call the setter `0x801163A0` on change.
+- The setter takes the frame from the table `0x801898E4[char]` (`0x33 + n`) and stores it in `+0x28`.
+- The frames are 44-byte records in `FIRST.EMI` at `0xEF8C4` (RAM `0x800F41C4`). Their pixels are LZ streams in the graphics bank, which is container entry 30 (file `0xC7800`, RAM `0x800BF600`). They are decoded by `0x8010D5C0` into a 256×16 4bpp strip; see `tools/lzh.py`.
+- US-unused frames: `0x37` LEI-LEI and `0x3C` GOUKI. They are redrawn as ANITA and MEI-LING.
+- MEI-LING needs more room, so DAN's stream moves to the bank padding: entry 30 grows from `0x275A8` to `0x27800`, and RAM `0x800E6BA8–0x800E6E00` is otherwise unused.
+
+**Text layer.** It is a 48×30 tilemap at `0x801C111C` (column stride `0x78`, cell = tile u16 + attr u16), drawn under the sprites.
+- Redraw is requested by writing 2 to `0x801667C0`.
+- API: `0x80107C98` colour, `0x80107CA8` font (0 = 8×8, 1 = 8×16, 2 = big), `0x80107CB8(col,row,str)` print, `0x80107C20` clear.
+- 8×16 font tiles: top = `(c&0x1F) + ((c&0xE0)<<1) + 0x40`, bottom = top + `0x20`.
+
+**X' markers.**
+- In a match, "X'" (8×16 font, palette 5) is drawn at col 22, row 26, between the win counters. It is written by a hook on the three calls to the per-frame match update `0x801351C8`.
+- It is erased on scene init (`0x80123FE4`).
+- On the title screen, "X' BALANCE PATCH" is printed at row 28.
+
+**Task stacks are small.** Hooks running in the scene-init path must not open a stack frame: an extra 0x18 bytes there corrupted the next scene. The stubs keep `ra` in `t8`.
+
+**Freed space.** The secret-code detectors (`0x8013CC60`, `0x8013CCF0`) and their call block in the select handler (`0x8013AA60–0x8013AACC`) are now unused and hold new code. The codes themselves no longer work; every secret character is reached by cycling.
+
+**Versus RESULT screen.** Rows for Devilot/Akuma/Dan appear once their "used" globals are set, which the confirm hook does. Mei-Ling/Anita count as Hsien-Ko/Donovan, as in vanilla.
+
+## 8. Design decisions
 
 1. **Secret characters:** Down on the bottom row cycles the cell's character through Devilot → Akuma → Dan → Mei-Ling → Anita → cell character. The cursor stays on the visible cell. Confirmation reuses the vanilla secret-code path, so all the vanilla side effects happen.
 2. **Mei-Ling / Anita** count as Hsien-Ko / Donovan: no +25 %, same patterns and rates.
 3. **Versus handicap** (Difficulty 1-5) is kept, with vanilla behaviour: `x += floor(x/10) * (diff + 1)` when the opponent's level is higher.
 4. **Free play** is not applicable on console.
 5. **Bosses:** the `+0x6C` flag is irrelevant under X' (no Devilot/Akuma penalty any more).
-6. **Branding** (X' marker in matches and on the title screen) is still to do.
+6. **Branding:** X' marker in matches, "X' BALANCE PATCH" on the title.
+7. **Mei-Ling / Anita labels** on the select screen (redrawn unused Japanese labels).

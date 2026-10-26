@@ -24,11 +24,9 @@ Done:
 - **Drop patterns.** New patterns for the five characters, including the Counter Gem previews on the select screen.
 - **Damage formula.** It reproduces the arcade X' patch exactly. It was fuzz-tested in an emulator against a Python model of the arcade code.
 - **Diamond.** It always applies its penalty, so the diamond trick is gone.
-- **Character select.** Pressing Down on the bottom row cycles through Devilot, Akuma, Dan, Mei-Ling and Anita.
-
-To do:
-
-- `X'` marker in game and on the title screen
+- **Character select.** Pressing Down on the bottom row cycles through Devilot, Akuma, Dan, Mei-Ling and Anita, and the select screen now has name labels for Mei-Ling and Anita.
+- **Markers.** `X'` appears between the win counters during matches, and "X' BALANCE PATCH" appears on the title screen.
+- **Codes.** The old secret-character codes are disabled; cycling replaces them.
 
 See [docs/RESEARCH.md](docs/RESEARCH.md) for the map of the PSX executable.
 
@@ -50,8 +48,8 @@ Needs `python3` and [armips](https://github.com/Kingcom/armips).
 On the character select screen, move to the bottom row and keep pressing
 **Down**: the character on that cell cycles through Devilot, Akuma, Dan,
 Mei-Ling and Anita, then back. Up, Left or Right return to the normal grid.
-The select screen has no art for Mei-Ling and Anita, so they appear there as
-Hsien-Ko and Donovan; they show up as themselves in the match.
+Mei-Ling and Anita keep Hsien-Ko's and Donovan's portrait on the select
+screen, with their own name label; they appear as themselves in the match.
 
 ## Tools
 
@@ -62,6 +60,9 @@ Hsien-Ko and Donovan; they show up as themselves in the match.
 | `tools/findpat.py` | scan a file for drop-pattern-shaped tables |
 | `tools/discpatch.py` | replace files in a BIN or PBP (EDC/ECC, PBP rebuild) |
 | `tools/previews.py` | redraw the Counter Gem previews from the EXE table |
+| `tools/lzh.py` | codec for the sprite-graphics LZ (decoder `0x8010D5C0`) |
+| `tools/labels.py` | builds the MEI-LING / ANITA select-screen labels in FIRST.EMI |
+| `tools/regress.py` | end-to-end regression in the emulator (screens, damage, secrets) |
 | `tools/model.py` | Python model of the arcade X' damage formula (for tests) |
 | `tools/lr.py` | headless libretro frontend (input scripting, RAM access, savestates, screenshots, watchpoints) |
 | `emu/build.sh` | builds an instrumented pcsx_rearmed libretro core (`emu/pcsx_rearmed-xdbg.patch`) |

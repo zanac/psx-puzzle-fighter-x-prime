@@ -30,7 +30,9 @@ python3 "$HERE/tools/checkexe.py" "$TMP/SLUS_004.18"
 # characters whose drop pattern changes, from the patched EXE's table
 for EMI in FIRST FIRSTE; do
 	python3 "$HERE/tools/extract.py" "$IN" "/DATA/$EMI.EMI" "$TMP/$EMI.EMI"
-	python3 "$HERE/tools/previews.py" "$TMP/SLUS_004.18.xp" "$TMP/$EMI.EMI" "$TMP/$EMI.EMI.xp" --chars 0,2,4,6,7
+	python3 "$HERE/tools/previews.py" "$TMP/SLUS_004.18.xp" "$TMP/$EMI.EMI" "$TMP/$EMI.EMI.pv" --chars 0,2,4,6,7
+	# select-screen name labels for Mei-Ling and Anita
+	python3 "$HERE/tools/labels.py" "$TMP/$EMI.EMI.pv" "$TMP/$EMI.EMI.xp"
 done
 python3 "$HERE/tools/discpatch.py" "$IN" "$OUT" \
 	"/SLUS_004.18=$TMP/SLUS_004.18.xp" \

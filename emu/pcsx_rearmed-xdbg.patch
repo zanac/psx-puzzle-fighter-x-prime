@@ -102,10 +102,10 @@ index a81dcaa..368a838 100644
  		*(u32 *)p = SWAPu32(value);
 diff --git a/libpcsxcore/xdbg.c b/libpcsxcore/xdbg.c
 new file mode 100644
-index 0000000..d2d6499
+index 0000000..b7b6aa7
 --- /dev/null
 +++ b/libpcsxcore/xdbg.c
-@@ -0,0 +1,104 @@
+@@ -0,0 +1,106 @@
 +#include <stdlib.h>
 +#include <string.h>
 +#include "xdbg.h"
@@ -210,6 +210,8 @@ index 0000000..d2d6499
 +	return 0;
 +}
 +EXPORT uint8_t *xdbg_snap(uint32_t i) { return snapbuf[i]; }
++uint32_t xdbg_cpu_pc(void) { return psxRegs.pc; }
++uint32_t xdbg_cpu_ra(void) { return psxRegs.GPR.n.ra; }
 diff --git a/libpcsxcore/xdbg.h b/libpcsxcore/xdbg.h
 new file mode 100644
 index 0000000..72abba8
@@ -250,10 +252,50 @@ index 0000000..72abba8
 +
 +#endif
 diff --git a/plugins/gpulib/gpu.c b/plugins/gpulib/gpu.c
-index f04e3a5..77e97e5 100644
+index f04e3a5..6384138 100644
 --- a/plugins/gpulib/gpu.c
 +++ b/plugins/gpulib/gpu.c
-@@ -1279,3 +1279,6 @@ void SysPrintf(const char *fmt, ...)
+@@ -28,6 +28,23 @@
+ 
+ struct psx_gpu gpu;
+ 
++/* research hook: log VRAM transfer commands */
++struct xdbg_gpucmd { uint32_t cmd, p1, p2, p3, pc, ra; };
++static struct xdbg_gpucmd xdbg_gpulog[1024];
++static uint32_t xdbg_gpun;
++extern uint32_t xdbg_cpu_pc(void), xdbg_cpu_ra(void);
++static void xdbg_gpu(uint32_t *d, int n)
++{
++  struct xdbg_gpucmd *e;
++  if (xdbg_gpun >= 1024) return;
++  e = &xdbg_gpulog[xdbg_gpun++];
++  e->cmd = d[0]; e->p1 = d[1]; e->p2 = d[2]; e->p3 = n > 3 ? d[3] : 0;
++  e->pc = xdbg_cpu_pc(); e->ra = xdbg_cpu_ra();
++}
++__attribute__((visibility("default"))) void *xdbg_gpu_log(void) { return xdbg_gpulog; }
++__attribute__((visibility("default"))) uint32_t xdbg_gpu_count(void) { uint32_t n = xdbg_gpun; return n; }
++__attribute__((visibility("default"))) void xdbg_gpu_clear(void) { xdbg_gpun = 0; }
++
+ static noinline int do_cmd_buffer(struct psx_gpu *gpu, uint32_t *data, int count,
+     int *cycles_sum, int *cycles_last);
+ static noinline void finish_vram_transfer(struct psx_gpu *gpu, int is_read, int is_async);
+@@ -860,6 +877,7 @@ static noinline int do_cmd_buffer(struct psx_gpu *gpu, uint32_t *data, int count
+       }
+ 
+       // consume vram write/read cmd
++      xdbg_gpu(data + pos, 3);
+       start_vram_transfer(gpu, LE32TOH(data[pos + 1]),
+         LE32TOH(data[pos + 2]), (cmd & 0xe0) == 0xc0);
+       pos += 3;
+@@ -873,6 +891,7 @@ static noinline int do_cmd_buffer(struct psx_gpu *gpu, uint32_t *data, int count
+         break;
+       *cycles_sum += *cycles_last;
+       *cycles_last = 0;
++      xdbg_gpu(data + pos, 4);
+       if (do_vram_copy_pre(gpu, data + pos, cycles_last))
+         do_vram_copy(gpu->vram, gpu->ex_regs, data + pos);
+       pos += 4;
+@@ -1279,3 +1298,6 @@ void SysPrintf(const char *fmt, ...)
  #endif
  
  // vim:shiftwidth=2:expandtab

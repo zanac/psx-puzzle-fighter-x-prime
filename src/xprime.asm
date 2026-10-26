@@ -4,6 +4,17 @@
 .psx
 .open IN, OUT, 0x80100000 - 0x800
 
+; ---- shared addresses ----
+CURSOR_CHARS equ 0x8016F6E4             ; cursor position -> character
+ALT_BITS     equ 0x801AE4D8             ; +0 Mei-Ling bits, +1 Anita bits
+TEXT_MAP     equ 0x801C111C             ; text layer, 48 cols x 30 rows, col stride 0x78
+TEXT_DIRTY   equ 0x801667C0             ; text layer redraw counter
+MARKER_COL   equ 22                     ; X' between the win counters
+MARKER_ROW   equ 26
+MARKER_PAL   equ 5
+TITLE_COL    equ 15                     ; "X' BALANCE PATCH" on the title, under the copyright
+TITLE_ROW    equ 28
+
 ; ============================================================================
 ; DROP PATTERNS  (table at 0x8016E684, 11 chars x 0xC0, rows bottom first)
 ; 1 Blue 2 Yellow 3 Green 4 Red; each row = 6 cells + 2 padding halfwords
@@ -207,6 +218,26 @@ xp_confirm:
 @@normal:
 	j       0x8013AC18
 	nop
+
+; xp_labelframe: tail of the label setter (0x801163DC); a0 = label object,
+; a2 = char * 2, v1 = vanilla frame (already being stored). The frames of
+; the unused Japanese labels LEI-LEI (0x37) and GOUKI (0x3C) are redrawn as
+; ANITA and MEI-LING in FIRST.EMI (tools/labels.py).
+xp_labelframe:
+	lbu     t0, 0x58(a0)
+	srl     t1, a2, 1
+	ori     t1, t1, 0x10
+	bne     t0, t1, @@done          ; no alternate for this label
+	li      t2, 0x14
+	beq     t0, t2, @@store
+	li      v1, 0x3C                ; Mei-Ling
+	li      v1, 0x37                ; Anita
+@@store:
+	sw      v1, 0x28(a0)
+@@done:
+	jr      ra
+	nop
+
 .endarea
 
 ; ============================================================================
@@ -233,8 +264,6 @@ xp_confirm:
 ; 0x801AE4D8 / 0x801AE4D9, exactly what the vanilla code entry produces.
 ; ============================================================================
 
-CURSOR_CHARS equ 0x8016F6E4             ; cursor position -> character
-ALT_BITS     equ 0x801AE4D8             ; +0 Mei-Ling bits, +1 Anita bits
 
 ; cursor badge ("1P"/"2P"): vanilla hides it when the character is >= 8;
 ; keep it on the cell while a secret character is shown there
@@ -371,5 +400,143 @@ xp_move:
 	jr      ra
 	addiu   sp, sp, 0x18
 .endarea
+; ============================================================================
+; FREE SPACE: the vanilla secret-code detectors (0x8013CC60 wrapper and
+; 0x8013CCF0, only called for the four select-screen codes) are no longer
+; needed - every secret character is reached by cycling. Their call block in
+; the select handler (0x8013AA60-0x8013AACC: argument setup + 4 calls) is
+; skipped and both places hold new code.
+; ============================================================================
+.org 0x8013AA60
+	b       0x8013AACC              ; skip the secret-code detectors
+	nop
+.area 0x8013AACC - 0x8013AA68, 0
+
+; ---- title screen line, after the vanilla "TM" print (0x80126C40) ----
+; no stack frame (task stacks are small); ra is kept in t8, which neither
+; the print routine (0x80107CB8) nor its callees use
+xp_title:
+	move    t8, ra
+	jal     0x80107CB8              ; vanilla print (a0..a2 untouched)
+	nop
+	li      a0, TITLE_COL
+	li      a1, TITLE_ROW
+	la      a2, xp_title_text
+	jal     0x80107CB8
+	nop
+	jr      t8
+	nop
+xp_title_text:
+	.ascii  "X' BALANCE PATCH"
+	.byte   0
+	.align  4
+.endarea
+
+.org 0x8013CC60
+.area 0x8013CD6C - 0x8013CC60, 0
+
+; ---- Mei-Ling / Anita name labels (see CHARACTER SELECT) ----
+; xp_labelkey replaces "lb v1, 0x74(a1)" in the per-frame label update
+; (P1 0x80116460, P2 0x801164C4); the caller's delay slot loads v0 = +0x58.
+; Returns v1 = character, | 0x10 when this player has the alternate bit,
+; so the label is refreshed when only the bit changes (Anita -> Donovan).
+xp_labelkey:
+	lb      v1, 0x74(a1)
+	lb      t0, 0x73(a1)
+	addiu   t2, v1, -4
+	sltiu   t3, t2, 2               ; Hsien-Ko or Donovan?
+	beqz    t3, @@ret
+	lui     t1, hi(ALT_BITS)
+	addu    t1, t1, t2              ; Mei-Ling byte or Anita byte
+	lbu     t1, lo(ALT_BITS)(t1)
+	nop
+	srlv    t1, t1, t0
+	andi    t1, t1, 1
+	sll     t1, t1, 4
+	or      v1, v1, t1
+@@ret:
+	jr      ra
+	nop
+
+; ---- X' marker between the win counters (8x16 font, text layer) ----
+; xp_marker_set: t3 != 0 draws the marker, t3 == 0 erases it if present.
+; Only t0-t3 are touched: the init hook's caller relies on a0-a3 surviving.
+MARKER_X equ (MARKER_PAL << 16) | 0xD8  ; 'X' top half; the cell value we test
+xp_marker_set:
+	la      t0, TEXT_MAP + MARKER_COL * 0x78 + MARKER_ROW * 4
+	lw      t2, 0(t0)
+	li      t1, MARKER_X
+	beqz    t3, @@erase
+	nop
+	beq     t2, t1, @@ret           ; already there
+	nop
+	sw      t1, 0(t0)
+	li      t1, (MARKER_PAL << 16) | 0xF8   ; 'X' bottom half
+	sw      t1, 4(t0)
+	li      t1, (MARKER_PAL << 16) | 0x87   ; apostrophe top half
+	sw      t1, 0x78(t0)
+	li      t1, (MARKER_PAL << 16) | 0xA7   ; apostrophe bottom half
+	b       @@dirty
+	sw      t1, 0x7C(t0)
+@@erase:
+	bne     t2, t1, @@ret           ; not ours: leave the cell alone
+	li      t1, 0x20                ; blank cell
+	sw      t1, 0(t0)
+	sw      t1, 4(t0)
+	sw      t1, 0x78(t0)
+	sw      t1, 0x7C(t0)
+@@dirty:
+	li      t1, 2                   ; redraw the text layer (2 buffers)
+	lui     t0, hi(TEXT_DIRTY)
+	sb      t1, lo(TEXT_DIRTY)(t0)
+@@ret:
+	jr      ra
+	nop
+
+; every match frame: replaces the 3 "jal 0x801351C8" (per-frame match
+; update, no arguments) and tail-jumps to it with the caller's ra
+xp_marker_frame:
+	move    t8, ra
+	jal     xp_marker_set
+	li      t3, 1
+	j       0x801351C8
+	move    ra, t8
+
+; scene/round init (replaces "jal 0x80124434" at 0x80123FE4): erase it, so
+; it never shows outside matches. No stack frame here: this runs on a small
+; task stack and an extra frame overflows it (ra is kept in t8; neither
+; 0x80124434 nor xp_marker_set touches t8).
+xp_marker_clear:
+	move    t8, ra
+	jal     0x80124434
+	nop
+	jal     xp_marker_set
+	move    t3, zero
+	jr      t8
+	nop
+.endarea
+
+; ---- name label hooks ----
+.org 0x80116460
+	jal     xp_labelkey             ; P1: v1 = label key
+.org 0x801164C4
+	jal     xp_labelkey             ; P2: v1 = label key
+.org 0x801163DC
+	j       xp_labelframe           ; label setter tail (delay slot stores v1)
+
+; ============================================================================
+; X' MARKERS
+; ============================================================================
+.org 0x80123FE4
+	jal     xp_marker_clear         ; scene / round init
+.org 0x80127BB0
+	jal     xp_marker_frame         ; per-frame match update (3 game loops)
+.org 0x80127C60
+	jal     xp_marker_frame
+.org 0x8012958C
+	jal     xp_marker_frame
+.org 0x80126C40
+	jal     xp_title                ; title screen text
+
 
 .close
