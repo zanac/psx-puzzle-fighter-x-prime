@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 """Apply the X' patch (JSON, made by mkpatch.py) to an original disc image.
 
-usage: applypatch.py PATCH.json ORIGINAL.(bin|pbp) OUTPUT.(bin|pbp)
-Pure Python 3, no dependencies. The output has the input's format.
+usage: applypatch.py PATCH.json ORIGINAL.(bin|cue|pbp) OUTPUT
+Writes OUTPUT.bin + OUTPUT.cue + OUTPUT.pbp, whatever the input format
+(OUTPUT may carry one of those extensions). Pure Python 3, no dependencies.
 """
 import hashlib, json, os, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import discpatch as D
+import discout
 
 def main(patch_path, src, dst):
     patch = json.load(open(patch_path))
-    img = D.open_image(src)
+    disc = discout.load(src)
+    img = disc.img
     for f in patch['files']:
         lba, size = D.iso_find(img, f['path'])
         data = bytearray(D.iso_read(img, lba, size))
@@ -22,8 +25,8 @@ def main(patch_path, src, dst):
             data[off:off + len(b)] = b
         assert hashlib.sha1(data).hexdigest() == f['sha1_out'], f['path']
         D.replace_file(img, f['path'], bytes(data))
-    img.save(dst)
-    print('done: %s' % dst)
+    for f in discout.write_all(disc, discout.output_base(dst)):
+        print('wrote %s' % f)
 
 if __name__ == '__main__':
     if len(sys.argv) != 4:

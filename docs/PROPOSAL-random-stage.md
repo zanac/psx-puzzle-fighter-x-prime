@@ -2,7 +2,7 @@
 
 Branch: `experimental/random-stage`. Status: **implemented (proposal A)**, see `src/stage.asm`.
 
-Decisions taken: proposal A. The setting starts at NORMAL and keeps the last choice between matches, until the title screen comes back. RANDOM never gives the same stage twice in a row.
+Decisions taken: proposal A, changed by P1 only. The setting starts at NORMAL and keeps the last choice between matches, until the title screen comes back. RANDOM never gives the same stage twice in a row.
 
 ## What the user asked
 
@@ -38,7 +38,7 @@ A line under the character grid, **Versus only**:
 (Real mockup: the text is written to the game's own text layer in the
 emulator, same font and palette as the in-match `X'` marker.)
 
-- **SELECT** (either player) cycles the setting:
+- **SELECT** (P1 only, until P1 confirms) cycles the setting:
   `NORMAL → RANDOM → MORRIGAN → CHUN-LI → RYU → KEN → HSIEN-KO → DONOVAN →
   FELICIA → SAKURA → DEVILOT → AKUMA → NORMAL`.
   A short menu sound on each press.

@@ -223,7 +223,7 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 
 **Patch (`src/stage.asm`).**
 - Line `< STAGE: name >` at col 14, row 27, palette 5, Versus select only. It is drawn by the select handler (the old secret-code call block at `0x8013AA60` jumps to `xp_stagekey`) and erased on scene init with the X' marker.
-- SELECT, from either player still choosing, cycles NORMAL → RANDOM → MORRIGAN … AKUMA.
+- SELECT cycles NORMAL → RANDOM → MORRIGAN … AKUMA. Only P1 can press it, while still choosing; P2's handler only draws the line.
 - `xp_stage` replaces the `lbu` at `0x8012CCE0`. In a Versus match, NORMAL keeps vanilla, a fixed setting n gives stage n-2, and RANDOM draws one of the 10 stages. The draw uses an LCG stirred with root counters 0 and 1, excluding the stage of the previous match.
 - `xp_title` resets the setting to NORMAL.
 - The code and its variables live at `0x801544E4`, a 996-byte function with no references (no `jal`, no pointer, no `lui`/`addiu` pair). Emulator coverage never reached it.

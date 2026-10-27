@@ -3,7 +3,7 @@
 ; Vanilla: the stage is the character of P1 (0x8012CCE0 -> 0x8019FC98), and
 ; the stage brings its own music. In Versus, a line under the character grid
 ;   < STAGE: NORMAL   >
-; is cycled with SELECT by either player (until they confirm):
+; is cycled with SELECT by P1 (until P1 confirms):
 ;   NORMAL, RANDOM, MORRIGAN .. AKUMA (the 10 stages), NORMAL ...
 ; NORMAL is vanilla. RANDOM draws a stage at every match, never the one of
 ; the previous match. The setting lives until the title screen comes back
@@ -16,7 +16,6 @@
 
 STAGE_IDX   equ 0x8019FC98              ; halfword, read by the stage loader
 PAD_P1      equ 0x801BF09E              ; pad bits pressed this frame
-PAD_P2      equ 0x801BF0AA
 PAD_SELECT  equ 0x0100
 STAGE_COL   equ 14
 STAGE_ROW   equ 27
@@ -38,11 +37,9 @@ xp_stagekey:
 	li      t1, 3
 	bne     t0, t1, @@out           ; Versus only
 	lb      t0, 0x73(s0)            ; player index
-	lui     t1, 0x801C
-	beqz    t0, @@p1
+	lui     t1, hi(PAD_P1)
+	bnez    t0, @@draw              ; only P1 changes the stage
 	lhu     t2, lo(PAD_P1)(t1)
-	lhu     t2, lo(PAD_P2)(t1)
-@@p1:
 	nop
 	andi    t2, t2, PAD_SELECT
 	beqz    t2, @@draw

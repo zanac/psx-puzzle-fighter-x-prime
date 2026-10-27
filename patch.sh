@@ -2,7 +2,8 @@
 # Apply the X' patch to an original Super Puzzle Fighter II Turbo (NTSC-U,
 # SLUS-00418) image. No assembler needed, only python3.
 #
-# usage: ./patch.sh <original.bin|original.pbp> <output.bin|output.pbp>
+# usage: ./patch.sh <original.bin|.cue|.pbp> <output>
+# Writes <output>.bin, <output>.cue and <output>.pbp, whatever the input.
 set -e
 if [ $# -ne 2 ]; then
 	sed -n '2,6p' "$0"

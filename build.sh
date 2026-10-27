@@ -1,17 +1,16 @@
 #!/bin/sh
 # Build Super Puzzle Fighter II Turbo X' (PSX) from an original NTSC-U image.
 #
-# usage: ./build.sh <input.bin|input.pbp> <output.bin|output.pbp> [armips]
+# usage: ./build.sh <input.bin|.cue|.pbp> <output> [armips]
 #
-# Input:  SLUS-00418, either a raw 2352-byte BIN (single data track, as in the
-#         usual BIN/CUE dumps) or a single-disc PBP.
-# Output: same format as the input. For BIN output, reuse the original .cue
-#         (renaming the FILE line if the file name changes).
+# Input:  SLUS-00418 as a raw 2352-byte BIN, a CUE (one or more BIN files)
+#         or a single-disc PBP.
+# Output: <output>.bin + <output>.cue + <output>.pbp, whatever the input.
 # Needs:  python3, armips (pass its path as 3rd argument or have it in PATH).
 set -e
 
 if [ $# -lt 2 ]; then
-	sed -n '2,11p' "$0"
+	sed -n '2,10p' "$0"
 	exit 1
 fi
 
@@ -34,7 +33,7 @@ for EMI in FIRST FIRSTE; do
 	# select-screen name labels for Mei-Ling and Anita
 	python3 "$HERE/tools/labels.py" "$TMP/$EMI.EMI.pv" "$TMP/$EMI.EMI.xp"
 done
-python3 "$HERE/tools/discpatch.py" "$IN" "$OUT" \
+python3 "$HERE/tools/discout.py" "$IN" "$OUT" \
 	"/SLUS_004.18=$TMP/SLUS_004.18.xp" \
 	"/DATA/FIRST.EMI=$TMP/FIRST.EMI.xp" \
 	"/DATA/FIRSTE.EMI=$TMP/FIRSTE.EMI.xp"
