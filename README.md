@@ -8,6 +8,10 @@ the original arcade game by [KScl/puzzle-fighter-x-prime](https://github.com/KSc
 This project reimplements the same logic in the PSX executable. The PSX port is
 compiled C rather than 68k assembly, so every change is rewritten from scratch.
 
+## Support
+Hey dude! Help me out for a couple of :beers: or a :coffee:!<br/>
+[![coffee](https://www.buymeacoffee.com/assets/img/custom_images/black_img.png)](https://bmc.link/zanac)
+
 ## Goals
 
 - New drop patterns for Morrigan, Ryu, Hsien-Ko, Felicia and Sakura
