@@ -21,7 +21,7 @@ compiled C rather than 68k assembly, so every change is rewritten from scratch.
 
 ## Screenshots
 
-**Title screen.** "X' BALANCE PATCH" is shown under the copyright.
+**Title screen.** "X' BALANCE PATCH BY ZANAC" is shown under the copyright.
 
 ![Title screen](docs/screenshots/title.png)
 
@@ -56,7 +56,7 @@ Done:
 - **Damage formula.** It reproduces the arcade X' patch exactly. It was fuzz-tested in an emulator against a Python model of the arcade code.
 - **Diamond.** It always applies its penalty, so the diamond trick is gone.
 - **Character select.** Pressing Down on the bottom row cycles through Devilot, Akuma, Dan, Mei-Ling and Anita, and the select screen now has name labels for Mei-Ling and Anita.
-- **Markers.** `X'` appears between the win counters during matches, and "X' BALANCE PATCH" appears on the title screen.
+- **Markers.** `X'` appears between the win counters during matches, and "X' BALANCE PATCH BY ZANAC" appears on the title screen.
 - **Codes.** The old secret-character codes are disabled; cycling replaces them.
 - **Versus stage selector** (branch `experimental/random-stage`). It is described below.
 - **Output formats.** The patch and build scripts always write BIN + CUE and PBP, whatever the input.

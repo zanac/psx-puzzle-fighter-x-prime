@@ -22,7 +22,7 @@ arcade logic, data layout and even the tables almost one-to-one.
 | Diamond | Always 80 %, "diamond trick" removed | code `0x119A6` |
 | Character select | Devilot/Akuma/Dan reachable by moving down from bottom row | code `0x789E`, tables `0x3F800` |
 | Defaults | Free Play on, handicap off, join-in on | soft dips `0x1E936` |
-| Branding | `X'` between win counters in matches; title line "X' BALANCE PATCH" | `0x16C0C`, `0x2DE8` |
+| Branding | `X'` between win counters in matches; title line "X' BALANCE PATCH BY ZANAC" | `0x16C0C`, `0x2DE8` |
 | Pattern preview | New preview tiles on char select (gfx IPS) | `0x7D80…`, gfx ROMs |
 
 Character ids (same on both platforms): 0 Morrigan, 1 Chun-Li, 2 Ryu, 3 Ken,
@@ -202,7 +202,7 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 **X' markers.**
 - In a match, "X'" (8×16 font, palette 5) is drawn at col 22, row 26, between the win counters. It is written by a hook on the three calls to the per-frame match update `0x801351C8`.
 - It is erased on scene init (`0x80123FE4`).
-- On the title screen, "X' BALANCE PATCH" is printed at row 28.
+- On the title screen, "X' BALANCE PATCH BY ZANAC" is printed at row 28.
 
 **Task stacks are small.** Hooks running in the scene-init path must not open a stack frame: an extra 0x18 bytes there corrupted the next scene. The stubs keep `ra` in `t8`.
 
@@ -235,6 +235,6 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 3. **Versus handicap** (Difficulty 1-5) is kept, with vanilla behaviour: `x += floor(x/10) * (diff + 1)` when the opponent's level is higher.
 4. **Free play** is not applicable on console.
 5. **Bosses:** the `+0x6C` flag is irrelevant under X' (no Devilot/Akuma penalty any more).
-6. **Branding:** X' marker in matches, "X' BALANCE PATCH" on the title.
+6. **Branding:** X' marker in matches, "X' BALANCE PATCH BY ZANAC" on the title.
 7. **Mei-Ling / Anita labels** on the select screen (redrawn unused Japanese labels).
 8. **Versus stage (experimental):** the selector starts at NORMAL. The choice is kept between matches until the title screen comes back. RANDOM never repeats the stage of the previous match.

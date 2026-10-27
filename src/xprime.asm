@@ -12,7 +12,7 @@ TEXT_DIRTY   equ 0x801667C0             ; text layer redraw counter
 MARKER_COL   equ 22                     ; X' between the win counters
 MARKER_ROW   equ 26
 MARKER_PAL   equ 5
-TITLE_COL    equ 15                     ; "X' BALANCE PATCH" on the title, under the copyright
+TITLE_COL    equ 11                     ; "X' BALANCE PATCH BY ZANAC" on the title, under the copyright
 TITLE_ROW    equ 28
 MODE         equ 0x8019C40F             ; game mode of the match (3 = Versus)
 MODE_NEXT    equ 0x8019C3FF             ; mode being set up (on the select screen)
@@ -434,7 +434,7 @@ xp_title:
 	jr      t8
 	nop
 xp_title_text:
-	.ascii  "X' BALANCE PATCH"
+	.ascii  "X' BALANCE PATCH BY ZANAC"
 	.byte   0
 	.align  4
 .endarea
