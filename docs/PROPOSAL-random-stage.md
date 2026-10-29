@@ -38,7 +38,8 @@ A line under the character grid, **Versus only**:
 (Real mockup: the text is written to the game's own text layer in the
 emulator, same font and palette as the in-match `X'` marker.)
 
-- **SELECT** (P1 only, until P1 confirms) cycles the setting:
+- **R1** next / **L1** previous (P1 only, until P1 confirms) change the setting
+  (first version used SELECT; changed to L1/R1 on request):
   `NORMAL → RANDOM → MORRIGAN → CHUN-LI → RYU → KEN → HSIEN-KO → DONOVAN →
   FELICIA → SAKURA → DEVILOT → AKUMA → NORMAL`.
   A short menu sound on each press.

@@ -2,8 +2,8 @@
 ; VERSUS STAGE SELECTOR
 ; Vanilla: the stage is the character of P1 (0x8012CCE0 -> 0x8019FC98), and
 ; the stage brings its own music. In Versus, a line under the character grid
-;   < STAGE: NORMAL   >
-; is cycled with SELECT by P1 (until P1 confirms):
+;   L1 < STAGE:  NORMAL  > R1
+; is changed by P1 (until P1 confirms): R1 next, L1 previous:
 ;   NORMAL, RANDOM, MORRIGAN .. AKUMA (the 10 stages), NORMAL ...
 ; NORMAL is vanilla. RANDOM draws a stage at every match, never the one of
 ; the previous match. The setting lives until the title screen comes back
@@ -16,13 +16,14 @@
 
 STAGE_IDX   equ 0x8019FC98              ; halfword, read by the stage loader
 PAD_P1      equ 0x801BF09E              ; pad bits pressed this frame
-PAD_SELECT  equ 0x0100
-STAGE_COL   equ 14
+PAD_L1      equ 0x0004
+PAD_R1      equ 0x0008
+STAGE_COL   equ 11
 STAGE_ROW   equ 27
 STAGE_PAL   equ 5
 STAGE_CELL  equ TEXT_MAP + STAGE_COL * 0x78 + STAGE_ROW * 4
-STAGE_TAG   equ (STAGE_PAL << 16) | 0x9C ; '<' top half: marks our line
-STAGE_LEN   equ 19
+STAGE_TAG   equ (STAGE_PAL << 16) | 0xCC ; 'L' top half: marks our line
+STAGE_LEN   equ 25
 N_SETTINGS  equ 12                      ; NORMAL, RANDOM, 10 stages
 
 .org 0x801544E4
@@ -41,16 +42,25 @@ xp_stagekey:
 	bnez    t0, @@draw              ; only P1 changes the stage
 	lhu     t2, lo(PAD_P1)(t1)
 	nop
-	andi    t2, t2, PAD_SELECT
+	andi    t2, t2, PAD_L1 | PAD_R1
 	beqz    t2, @@draw
 	la      t3, xp_stg_setting
 	lbu     t1, 0(t3)
+	andi    t2, t2, PAD_R1
+	beqz    t2, @@prev
 	nop
-	addiu   t1, t1, 1
+	addiu   t1, t1, 1               ; R1: next
 	sltiu   t2, t1, N_SETTINGS
 	bnez    t2, @@store
 	nop
+	b       @@store
 	move    t1, zero
+@@prev:                                 ; L1: previous
+	bnez    t1, @@dec
+	nop
+	li      t1, N_SETTINGS
+@@dec:
+	addiu   t1, t1, -1
 @@store:
 	sb      t1, 0(t3)
 	li      a0, 0xD                 ; cursor sound
@@ -78,10 +88,10 @@ xp_stage_draw:
 	nop
 @@redraw:
 	sb      t1, 1(t0)
-	la      t3, xp_stg_names        ; name -> line[9..16]
+	la      t3, xp_stg_names        ; name -> line[12..19]
 	sll     t5, t1, 3
 	addu    t3, t3, t5
-	la      t5, xp_stg_line + 9
+	la      t5, xp_stg_line + 12
 	li      t4, 8
 @@copy:
 	lbu     t6, 0(t3)
@@ -194,7 +204,7 @@ xp_stg_setting:
 	.byte   0
 	.word   0x2F6B1D35              ; +4 random state
 xp_stg_line:
-	.ascii  "< STAGE: ........ >"
+	.ascii  "L1 < STAGE: ........ > R1"
 	.byte   0
 xp_stg_names:                           ; 8 characters each, centred
 	.ascii  " NORMAL  RANDOM MORRIGANCHUN-LI "

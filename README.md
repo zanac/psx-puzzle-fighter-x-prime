@@ -44,7 +44,7 @@ Mei-Ling and Anita get their own name labels, which the original select screen n
 
 ![Match with the X' marker](docs/screenshots/match.png)
 
-**Versus stage selector.** P1 picks the stage under the character grid with SELECT. From left to right: RANDOM, then AKUMA, and the match that follows on Akuma's stage.
+**Versus stage selector.** P1 picks the stage under the character grid with **R1** (next) and **L1** (previous). From left to right: RANDOM, then AKUMA, and the match that follows on Akuma's stage.
 
 ![Stage selector: RANDOM, AKUMA, match on Akuma's stage](docs/screenshots/stage_selector.png)
 
@@ -71,7 +71,7 @@ See [docs/RESEARCH.md](docs/RESEARCH.md) for the map of the PSX executable.
 
 This feature is on the branch `experimental/random-stage`.
 
-In Versus, the character select shows a stage line under the grid. **P1** presses **SELECT**, before confirming, to cycle through:
+In Versus, the character select shows a stage line under the grid. **P1** presses **R1** (next) or **L1** (previous), before confirming, to move through:
 
 `NORMAL → RANDOM → MORRIGAN → CHUN-LI → RYU → KEN → HSIEN-KO → DONOVAN → FELICIA → SAKURA → DEVILOT → AKUMA`
 
@@ -141,9 +141,11 @@ screen, with their own name label; they appear as themselves in the match.
 
 ## How to choose the Versus stage
 
-On the Versus character select, P1 presses **SELECT** before confirming the
-character. The line under the grid shows the setting (NORMAL, RANDOM or a
-stage name). P2's SELECT does nothing.
+On the Versus character select, before confirming the character, P1 presses
+**R1** to go to the next setting or **L1** to go back. The line
+`L1 < STAGE: name > R1` under the grid shows the setting (NORMAL, RANDOM or
+a stage name). For a random stage at every match, press R1 once (RANDOM).
+P2's L1/R1 do nothing.
 
 ## Tools
 

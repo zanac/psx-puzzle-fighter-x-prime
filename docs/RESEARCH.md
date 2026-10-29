@@ -218,12 +218,12 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 - Stage files: `DATA/STAGE00..09.EMI`, file ids `0x4A + n` in the LBA table at `0x80165CC0`.
 - The match music follows the stage, not the characters.
 - Mode bytes: `0x8019C3FF` is the mode being set up (3 = Versus on the select screen), `0x8019C40F` the mode of the running match.
-- Pads: pressed this frame at `0x801BF09E` (P1) / `0x801BF0AA` (P2), held at `0x801BF09C`; SELECT = `0x0100`.
+- Pads: pressed this frame at `0x801BF09E` (P1) / `0x801BF0AA` (P2), held at `0x801BF09C`; bits: SELECT `0x0100`, L2 `0x01`, R2 `0x02`, L1 `0x04`, R1 `0x08`, up/right/down/left `0x1000/0x2000/0x4000/0x8000`.
 - RESULT screen cursor: `0x8019C3DA` (0 CONTINUE, 1 END, 2 CLEAR RESULT).
 
 **Patch (`src/stage.asm`).**
-- Line `< STAGE: name >` at col 14, row 27, palette 5, Versus select only. It is drawn by the select handler (the old secret-code call block at `0x8013AA60` jumps to `xp_stagekey`) and erased on scene init with the X' marker.
-- SELECT cycles NORMAL → RANDOM → MORRIGAN … AKUMA. Only P1 can press it, while still choosing; P2's handler only draws the line.
+- Line `L1 < STAGE: name > R1` at col 11, row 27, palette 5, Versus select only. It is drawn by the select handler (the old secret-code call block at `0x8013AA60` jumps to `xp_stagekey`) and erased on scene init with the X' marker.
+- R1 moves forward and L1 back, both wrapping, through NORMAL → RANDOM → MORRIGAN … AKUMA. Only P1 can change it, while still choosing; P2's handler only draws the line.
 - `xp_stage` replaces the `lbu` at `0x8012CCE0`. In a Versus match, NORMAL keeps vanilla, a fixed setting n gives stage n-2, and RANDOM draws one of the 10 stages. The draw uses an LCG stirred with root counters 0 and 1, excluding the stage of the previous match.
 - `xp_title` resets the setting to NORMAL.
 - The code and its variables live at `0x801544E4`, a 996-byte function with no references (no `jal`, no pointer, no `lui`/`addiu` pair). Emulator coverage never reached it.
