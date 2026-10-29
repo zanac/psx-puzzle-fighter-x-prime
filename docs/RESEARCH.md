@@ -211,7 +211,7 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 
 **Versus RESULT screen.** Rows for Devilot/Akuma/Dan appear once their "used" globals are set, which the confirm hook does. Mei-Ling/Anita count as Hsien-Ko/Donovan, as in vanilla.
 
-## 7b. Versus stage selector (experimental branch)
+## 7b. Versus stage selector
 
 **Vanilla.**
 - `0x8012CCE0`: `stage = player[s2].char` (P1 in Versus), stored as a halfword at `0x8019FC98`. It runs once per match, not per round.
@@ -238,4 +238,4 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 5. **Bosses:** the `+0x6C` flag is irrelevant under X' (no Devilot/Akuma penalty any more).
 6. **Branding:** X' marker in matches, "X' BALANCE PATCH BY ZANAC" on the title.
 7. **Mei-Ling / Anita labels** on the select screen (redrawn unused Japanese labels).
-8. **Versus stage (experimental):** the selector starts at RANDOM. The choice is kept between matches until the title screen comes back. RANDOM never repeats the stage of the previous match.
+8. **Versus stage:** the selector starts at RANDOM. The choice is kept between matches until the title screen comes back. RANDOM never repeats the stage of the previous match.

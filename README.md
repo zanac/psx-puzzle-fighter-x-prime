@@ -21,7 +21,7 @@ Hey dude! Help me out for a couple of :beers: or a :coffee:!<br/>
 - Devilot, Akuma and Dan selectable without codes
 - **PSX X' addition — Dan:** new "Gadoken" drop pattern (red spine: columns 1/3/5 red, mixed pairs between) instead of all red; sends 110 % and receives 110 %
 - `X'` marker in game
-- **Versus stage selector (experimental branch):** RANDOM (default), NORMAL or a fixed stage, chosen by P1 on the select screen
+- **Versus stage selector:** RANDOM (default), NORMAL or a fixed stage, chosen by P1 on the select screen
 
 ## Screenshots
 
@@ -62,14 +62,12 @@ Done:
 - **Character select.** Pressing Down on the bottom row cycles through Devilot, Akuma, Dan, Mei-Ling and Anita, and the select screen now has name labels for Mei-Ling and Anita.
 - **Markers.** `X'` appears between the win counters during matches, and "X' BALANCE PATCH BY ZANAC" appears on the title screen.
 - **Codes.** The old secret-character codes are disabled; cycling replaces them.
-- **Versus stage selector** (branch `experimental/random-stage`). It is described below.
+- **Versus stage selector.** It is described below.
 - **Output formats.** The patch and build scripts always write BIN + CUE and PBP, whatever the input.
 
 See [docs/RESEARCH.md](docs/RESEARCH.md) for the map of the PSX executable.
 
-## Versus stage selector (experimental)
-
-This feature is on the branch `experimental/random-stage`.
+## Versus stage selector
 
 In Versus, the character select shows a stage line under the grid. **P1** presses **R1** (next) or **L1** (previous), before confirming, to move through:
 

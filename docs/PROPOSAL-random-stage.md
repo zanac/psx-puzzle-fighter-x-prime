@@ -1,6 +1,6 @@
 # Proposal: stage selector for Versus (random or fixed)
 
-Branch: `experimental/random-stage`. Status: **implemented (proposal A)**, see `src/stage.asm`.
+Developed on the branch `experimental/random-stage`, now merged into `main`. Status: **implemented (proposal A)**, see `src/stage.asm`.
 
 Decisions taken: proposal A, changed by P1 only. Later changed to: R1/L1 instead of SELECT, RANDOM as the default. The setting keeps the last choice between matches, until the title screen comes back. RANDOM never gives the same stage twice in a row.
 
