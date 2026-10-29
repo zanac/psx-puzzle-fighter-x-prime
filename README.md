@@ -21,7 +21,7 @@ Hey dude! Help me out for a couple of :beers: or a :coffee:!<br/>
 - Devilot, Akuma and Dan selectable without codes
 - **PSX X' addition — Dan:** new "Gadoken" drop pattern (red spine: columns 1/3/5 red, mixed pairs between) instead of all red; sends 110 % and receives 110 %
 - `X'` marker in game
-- **Versus stage selector (experimental branch):** NORMAL, RANDOM or a fixed stage, chosen by P1 on the select screen
+- **Versus stage selector (experimental branch):** RANDOM (default), NORMAL or a fixed stage, chosen by P1 on the select screen
 
 ## Screenshots
 
@@ -29,7 +29,7 @@ Hey dude! Help me out for a couple of :beers: or a :coffee:!<br/>
 
 ![Title screen](docs/screenshots/title.png)
 
-**Secret characters without codes.** On the bottom row, Down cycles the cell through Devilot → Akuma → Dan → Mei-Ling → Anita and back.
+**Secret characters without codes.** On the bottom row, Down cycles the cell through Devilot → Akuma → Dan → Mei-Ling → Anita and back; Up walks the same ring backwards.
 Mei-Ling and Anita get their own name labels, which the original select screen never had.
 
 ![Secret character cycle](docs/screenshots/select_cycle.png)
@@ -75,11 +75,11 @@ In Versus, the character select shows a stage line under the grid. **P1** presse
 
 `NORMAL → RANDOM → MORRIGAN → CHUN-LI → RYU → KEN → HSIEN-KO → DONOVAN → FELICIA → SAKURA → DEVILOT → AKUMA`
 
-- **NORMAL** is the vanilla behaviour: the stage of P1's character. It is the default.
-- **RANDOM** draws a new stage at every match and never repeats the stage of the previous match.
+- **RANDOM** is the default. It draws a new stage at every match and never repeats the stage of the previous match.
+- **NORMAL** is the vanilla behaviour: the stage of P1's character.
 - A **fixed stage** is used for every match.
 - Each stage brings its own music, as in vanilla.
-- The choice is kept from match to match (CONTINUE) and goes back to NORMAL when the title screen comes back.
+- The choice is kept from match to match (CONTINUE) and goes back to RANDOM when the title screen comes back.
 - In a 3-round match, the stage stays the same for every round.
 - Arcade, Street Puzzle and the demo are not changed.
 
@@ -132,7 +132,11 @@ Needs `python3` and [armips](https://github.com/Kingcom/armips).
 
 On the character select screen, move to the bottom row and keep pressing
 **Down**: the character on that cell cycles through Devilot, Akuma, Dan,
-Mei-Ling and Anita, then back. Up, Left or Right return to the normal grid.
+Mei-Ling and Anita, then back to the cell's own character. While a secret
+character is shown, **Up** goes back one step in the same ring (Anita →
+Mei-Ling → Dan → Akuma → Devilot → the cell's character). On the cell's own
+character, Up moves to the top row as usual; Left or Right return to the
+normal grid.
 As in vanilla, the button used to confirm picks the colours: Circle or
 Triangle give the standard colours, Cross or Square the alternate ones.
 
@@ -144,7 +148,7 @@ screen, with their own name label; they appear as themselves in the match.
 On the Versus character select, before confirming the character, P1 presses
 **R1** to go to the next setting or **L1** to go back. The line
 `L1 < STAGE: name > R1` under the grid shows the setting (NORMAL, RANDOM or
-a stage name). For a random stage at every match, press R1 once (RANDOM).
+a stage name). RANDOM is already selected when you enter Versus.
 P2's L1/R1 do nothing.
 
 ## Tools

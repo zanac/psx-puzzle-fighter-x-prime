@@ -164,6 +164,7 @@ top branch as well.
 
 - Input bits: `0x1000` up (−4), `0x4000` down (+4), `0x8000` left (−1), `0x2000` right (+1).
 - The cursor is kept in 0..7, and moving left/right between 3 and 4 is blocked.
+- Up on the bottom row while a secret character is shown (X' addition, `xp_up` in `src/stage.asm`) walks the Down ring backwards: Anita → Mei-Ling → Dan → Akuma → Devilot → cell character. On the cell's own character, Up moves the cursor as in vanilla.
 - After a move, the code writes the character from the `0x8016F6E4` table to `+0x74` and to `0x801BAAC4`, plays SE `0x17`, and clears the Mei-Ling/Anita bits.
 - **The Counter Gem preview is pre-drawn art, not generated from the table.**
   It is a 4bpp texture page at VRAM (640,0), CLUT (0,491), stored raw in
@@ -225,7 +226,7 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 - Line `L1 < STAGE: name > R1` at col 11, row 27, palette 5, Versus select only. It is drawn by the select handler (the old secret-code call block at `0x8013AA60` jumps to `xp_stagekey`) and erased on scene init with the X' marker.
 - R1 moves forward and L1 back, both wrapping, through NORMAL → RANDOM → MORRIGAN … AKUMA. Only P1 can change it, while still choosing; P2's handler only draws the line.
 - `xp_stage` replaces the `lbu` at `0x8012CCE0`. In a Versus match, NORMAL keeps vanilla, a fixed setting n gives stage n-2, and RANDOM draws one of the 10 stages. The draw uses an LCG stirred with root counters 0 and 1, excluding the stage of the previous match.
-- `xp_title` resets the setting to NORMAL.
+- The setting starts at RANDOM, and `xp_title` resets it to RANDOM.
 - The code and its variables live at `0x801544E4`, a 996-byte function with no references (no `jal`, no pointer, no `lui`/`addiu` pair). Emulator coverage never reached it.
 
 ## 8. Design decisions
@@ -237,4 +238,4 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 5. **Bosses:** the `+0x6C` flag is irrelevant under X' (no Devilot/Akuma penalty any more).
 6. **Branding:** X' marker in matches, "X' BALANCE PATCH BY ZANAC" on the title.
 7. **Mei-Ling / Anita labels** on the select screen (redrawn unused Japanese labels).
-8. **Versus stage (experimental):** the selector starts at NORMAL. The choice is kept between matches until the title screen comes back. RANDOM never repeats the stage of the previous match.
+8. **Versus stage (experimental):** the selector starts at RANDOM. The choice is kept between matches until the title screen comes back. RANDOM never repeats the stage of the previous match.

@@ -291,7 +291,7 @@ xp_move:
 	sw      s0, 0x10(sp)
 	sw      ra, 0x14(sp)
 	andi    v0, a1, 0xF000
-	beqz    v0, @@ret
+	beqz    v0, xp_mv_ret
 	move    s0, a0
 	lbu     t0, 1(a2)                   ; cursor position
 	lb      t4, 0x73(s0)                ; player index
@@ -305,72 +305,72 @@ xp_move:
 	move    t9, zero                    ; bit to set in Anita bits
 	andi    a1, a1, 0xFFFF
 	li      v0, 0x1000                  ; up
-	beq     a1, v0, @@updown
+	beq     a1, v0, xp_up               ; (stage.asm: Up cycles back)
 	addiu   t1, t0, -4
 	li      v0, 0x8000                  ; left
-	beq     a1, v0, @@leftright
+	beq     a1, v0, xp_mv_leftright
 	addiu   t1, t0, -1
 	li      v0, 0x2000                  ; right
-	beq     a1, v0, @@leftright
+	beq     a1, v0, xp_mv_leftright
 	addiu   t1, t0, 1
 	li      v0, 0x4000                  ; down
-	bne     a1, v0, @@ret
+	bne     a1, v0, xp_mv_ret
 	addiu   t1, t0, 4
 	sltiu   v0, t0, 4
-	bnez    v0, @@updown                ; top row: plain move down
+	bnez    v0, xp_mv_updown                ; top row: plain move down
 	nop
 
 	; Down on the bottom row: cycle the character of this cell
 	lbu     t2, 0(a2)
 	li      v0, 10
-	bne     t2, v0, @@not_dan
+	bne     t2, v0, xp_mv_not_dan
 	slti    v0, t2, 8
 	li      t2, 4                       ; Dan -> Mei-Ling
-	b       @@apply
+	b       xp_mv_apply
 	move    t3, t5
-@@not_dan:
-	bnez    v0, @@not_secret
+xp_mv_not_dan:
+	bnez    v0, xp_mv_not_secret
 	li      v0, 4
-	b       @@apply
+	b       xp_mv_apply
 	addiu   t2, t2, 1                   ; Devilot -> Akuma -> Dan
-@@not_secret:
-	bne     t2, v0, @@not_meiling
+xp_mv_not_secret:
+	bne     t2, v0, xp_mv_not_meiling
 	and     v1, t7, t5
-	beqz    v1, @@not_meiling
+	beqz    v1, xp_mv_not_meiling
 	nop
 	li      t2, 5                       ; Mei-Ling -> Anita
-	b       @@apply
+	b       xp_mv_apply
 	move    t9, t5
-@@not_meiling:
+xp_mv_not_meiling:
 	li      v0, 5
-	bne     t2, v0, @@to_devilot
+	bne     t2, v0, xp_mv_to_devilot
 	and     v1, t8, t5
-	bnez    v1, @@cell_char             ; Anita -> cell character
+	bnez    v1, xp_mv_cell             ; Anita -> cell character
 	nop
-@@to_devilot:
-	b       @@apply
+xp_mv_to_devilot:
+	b       xp_mv_apply
 	li      t2, 8                       ; cell character -> Devilot
 
-@@leftright:                            ; stay on the same row
+xp_mv_leftright:                            ; stay on the same row
 	srl     v0, t1, 2
 	srl     v1, t0, 2
-	bne     v0, v1, @@ret
+	bne     v0, v1, xp_mv_ret
 	nop
-	b       @@moved
+	b       xp_mv_moved
 	nop
-@@updown:
+xp_mv_updown:
 	sltiu   v0, t1, 8
-	beqz    v0, @@ret
+	beqz    v0, xp_mv_ret
 	nop
-@@moved:
+xp_mv_moved:
 	sb      t1, 1(a2)
 	move    t0, t1
-@@cell_char:                            ; t0 = cursor position
+xp_mv_cell:                            ; t0 = cursor position
 	la      v0, CURSOR_CHARS
 	addu    v0, v0, t0
 	lbu     t2, 0(v0)
 
-@@apply:                                ; t2 = character, t3/t9 = alt bit to set
+xp_mv_apply:                                ; t2 = character, t3/t9 = alt bit to set
 	and     t7, t7, t6
 	or      t7, t7, t3
 	and     t8, t8, t6
@@ -389,17 +389,17 @@ xp_move:
 	lb      a0, 0x73(s0)                ; portrait / name
 	lb      a1, 0x74(s0)
 	lui     a2, 0x801B
-	bnez    a0, @@p2
+	bnez    a0, xp_mv_p2
 	nop
-	b       @@portrait
+	b       xp_mv_portrait
 	lb      a2, -0x1A93(a2)             ; P1 +0x6D (0x801AE56D)
-@@p2:
+xp_mv_p2:
 	lb      a2, -0x17E7(a2)             ; P2 +0x6D (0x801AE819)
-@@portrait:
+xp_mv_portrait:
 	nop                                 ; load delay
 	jal     0x8010789C
 	nop
-@@ret:
+xp_mv_ret:
 	lw      ra, 0x14(sp)
 	lw      s0, 0x10(sp)
 	jr      ra
@@ -422,8 +422,9 @@ xp_move:
 ; the print routine (0x80107CB8) nor its callees use
 xp_title:
 	move    t8, ra
-	lui     t0, hi(xp_stg_setting)  ; back on the title: stage = NORMAL
-	sb      zero, lo(xp_stg_setting)(t0)
+	lui     t0, hi(xp_stg_setting)  ; back on the title: stage = RANDOM
+	li      t1, 1
+	sb      t1, lo(xp_stg_setting)(t0)
 	jal     0x80107CB8              ; vanilla print (a0..a2 untouched)
 	nop
 	li      a0, TITLE_COL

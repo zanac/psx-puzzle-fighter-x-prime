@@ -5,9 +5,9 @@
 ;   L1 < STAGE:  NORMAL  > R1
 ; is changed by P1 (until P1 confirms): R1 next, L1 previous:
 ;   NORMAL, RANDOM, MORRIGAN .. AKUMA (the 10 stages), NORMAL ...
-; NORMAL is vanilla. RANDOM draws a stage at every match, never the one of
-; the previous match. The setting lives until the title screen comes back
-; (xp_title resets it). Arcade, Street Puzzle and demo are not touched.
+; NORMAL is vanilla. RANDOM (the default) draws a stage at every match,
+; never the one of the previous match. The setting lives until the title
+; screen comes back (xp_title resets it to RANDOM). Arcade, Street Puzzle and demo are not touched.
 ;
 ; Code space: 0x801544E4 is a 996-byte function that nothing references
 ; (no jal, no pointer, no lui/addiu pair) and that never runs (emulator
@@ -196,9 +196,52 @@ xp_stage:
 	jr      ra
 	sb      t4, 2(t2)
 
+; ---- character select: Up on a secret character cycles back ----
+; xp_move (0x8013AD30) branches here on Up, with t0 = cursor position,
+; t1 = t0 - 4, t4 = hi(ALT_BITS), t5 = this player's alt bit, t7/t8 =
+; Mei-Ling/Anita bits, t3 = t9 = 0. On the bottom row, while the cell shows
+; a secret character, Up walks the Down ring backwards:
+;   Anita -> Mei-Ling -> Dan -> Akuma -> Devilot -> cell character
+; Otherwise (top row, or the cell's own character) Up moves as in vanilla.
+xp_up:
+	sltiu   v0, t0, 4
+	bnez    v0, @@vanilla           ; top row
+	lbu     t2, 0(a2)               ; character shown on the cell
+	nop
+	sltiu   v0, t2, 8
+	bnez    v0, @@alts
+	li      v0, 8
+	beq     t2, v0, @@cell          ; Devilot -> cell character
+	nop
+	j       xp_mv_apply             ; Dan -> Akuma -> Devilot
+	addiu   t2, t2, -1
+@@alts:
+	li      v0, 4
+	bne     t2, v0, @@anita
+	and     v1, t7, t5
+	beqz    v1, @@vanilla           ; plain Hsien-Ko
+	nop
+	j       xp_mv_apply             ; Mei-Ling -> Dan
+	li      t2, 10
+@@anita:
+	li      v0, 5
+	bne     t2, v0, @@vanilla
+	and     v1, t8, t5
+	beqz    v1, @@vanilla           ; plain Donovan
+	nop
+	move    t3, t5                  ; Anita -> Mei-Ling
+	j       xp_mv_apply
+	li      t2, 4
+@@cell:
+	j       xp_mv_cell
+	nop
+@@vanilla:
+	j       xp_mv_updown
+	nop
+
 .align 4
 xp_stg_setting:
-	.byte   0                       ; +0 setting (0 NORMAL, 1 RANDOM, 2+ stage)
+	.byte   1                       ; +0 setting (0 NORMAL, 1 RANDOM, 2+ stage)
 	.byte   0xFF                    ; +1 setting on screen
 	.byte   0xFF                    ; +2 stage of the previous match
 	.byte   0

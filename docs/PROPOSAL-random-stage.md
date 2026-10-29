@@ -2,7 +2,7 @@
 
 Branch: `experimental/random-stage`. Status: **implemented (proposal A)**, see `src/stage.asm`.
 
-Decisions taken: proposal A, changed by P1 only. The setting starts at NORMAL and keeps the last choice between matches, until the title screen comes back. RANDOM never gives the same stage twice in a row.
+Decisions taken: proposal A, changed by P1 only. Later changed to: R1/L1 instead of SELECT, RANDOM as the default. The setting keeps the last choice between matches, until the title screen comes back. RANDOM never gives the same stage twice in a row.
 
 ## What the user asked
 
@@ -43,14 +43,14 @@ emulator, same font and palette as the in-match `X'` marker.)
   `NORMAL → RANDOM → MORRIGAN → CHUN-LI → RYU → KEN → HSIEN-KO → DONOVAN →
   FELICIA → SAKURA → DEVILOT → AKUMA → NORMAL`.
   A short menu sound on each press.
-- `NORMAL` = vanilla (stage of P1's character). Default.
+- `NORMAL` = vanilla (stage of P1's character).
 - `RANDOM` = one of the 10 stages, drawn again **at every match**, never
   the stage of the previous match.
   Seed: the PSX hardware root counter mixed with the frame counter, so it
   depends on when the players press the buttons (good enough, no fixed
   sequence).
 - Fixed stage = that stage every match.
-- The setting is kept from match to match and goes back to `NORMAL` when
+- The setting is kept from match to match and goes back to `RANDOM` (the default) when
   the title screen comes back (it is not saved to the memory card).
 - Arcade, Street Puzzle and demo are **not** touched.
 
@@ -85,7 +85,7 @@ result as A.
 Tested in the emulator:
 - Every setting gives the expected stage index.
 - RANDOM over 8 matches in a row gave 7, 1, 6, 5, 7, 1, 4, 0, with no stage repeated back to back.
-- The setting survives CONTINUE and is back to NORMAL after END and the title.
+- The setting survives CONTINUE and is back to the default after END and the title.
 - The line is erased on the VS screen and in matches, where the X' marker is intact.
 - The Arcade select has no line, and the Arcade stages are vanilla.
 - The full regression passes: damage fuzz 150/150, select, Arcade with Devilot, Street Puzzle and demo.
