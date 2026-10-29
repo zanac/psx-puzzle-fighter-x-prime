@@ -22,7 +22,7 @@ arcade logic, data layout and even the tables almost one-to-one.
 | Diamond | Always 80 %, "diamond trick" removed | code `0x119A6` |
 | Character select | Devilot/Akuma/Dan reachable by moving down from bottom row | code `0x789E`, tables `0x3F800` |
 | Defaults | Free Play on, handicap off, join-in on | soft dips `0x1E936` |
-| Branding | `X'` between win counters in matches; title line "X' BALANCE PATCH" | `0x16C0C`, `0x2DE8` |
+| Branding | `X'` between win counters in matches; title line "X' BALANCE PATCH BY ZANAC" | `0x16C0C`, `0x2DE8` |
 | Pattern preview | New preview tiles on char select (gfx IPS) | `0x7D80…`, gfx ROMs |
 
 Character ids (same on both platforms): 0 Morrigan, 1 Chun-Li, 2 Ryu, 3 Ken,
@@ -164,6 +164,7 @@ top branch as well.
 
 - Input bits: `0x1000` up (−4), `0x4000` down (+4), `0x8000` left (−1), `0x2000` right (+1).
 - The cursor is kept in 0..7, and moving left/right between 3 and 4 is blocked.
+- Up on the bottom row while a secret character is shown (X' addition, `xp_up` in `src/stage.asm`) walks the Down ring backwards: Anita → Mei-Ling → Dan → Akuma → Devilot → cell character. On the cell's own character, Up moves the cursor as in vanilla.
 - After a move, the code writes the character from the `0x8016F6E4` table to `+0x74` and to `0x801BAAC4`, plays SE `0x17`, and clears the Mei-Ling/Anita bits.
 - **The Counter Gem preview is pre-drawn art, not generated from the table.**
   It is a 4bpp texture page at VRAM (640,0), CLUT (0,491), stored raw in
@@ -202,13 +203,31 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 **X' markers.**
 - In a match, "X'" (8×16 font, palette 5) is drawn at col 22, row 26, between the win counters. It is written by a hook on the three calls to the per-frame match update `0x801351C8`.
 - It is erased on scene init (`0x80123FE4`).
-- On the title screen, "X' BALANCE PATCH" is printed at row 28.
+- On the title screen, "X' BALANCE PATCH BY ZANAC" is printed at row 28.
 
 **Task stacks are small.** Hooks running in the scene-init path must not open a stack frame: an extra 0x18 bytes there corrupted the next scene. The stubs keep `ra` in `t8`.
 
 **Freed space.** The secret-code detectors (`0x8013CC60`, `0x8013CCF0`) and their call block in the select handler (`0x8013AA60–0x8013AACC`) are now unused and hold new code. The codes themselves no longer work; every secret character is reached by cycling.
 
 **Versus RESULT screen.** Rows for Devilot/Akuma/Dan appear once their "used" globals are set, which the confirm hook does. Mei-Ling/Anita count as Hsien-Ko/Donovan, as in vanilla.
+
+## 7b. Versus stage selector (experimental branch)
+
+**Vanilla.**
+- `0x8012CCE0`: `stage = player[s2].char` (P1 in Versus), stored as a halfword at `0x8019FC98`. It runs once per match, not per round.
+- `0x80107944` loads the stage when it differs from the cached one (`0x801BF114`): `table[stage]` at `0x80166728` (11 entries; Dan, 10, shares Ken's function). Two more 11-entry tables follow at `0x80166754` and `0x80166780`.
+- Stage files: `DATA/STAGE00..09.EMI`, file ids `0x4A + n` in the LBA table at `0x80165CC0`.
+- The match music follows the stage, not the characters.
+- Mode bytes: `0x8019C3FF` is the mode being set up (3 = Versus on the select screen), `0x8019C40F` the mode of the running match.
+- Pads: pressed this frame at `0x801BF09E` (P1) / `0x801BF0AA` (P2), held at `0x801BF09C`; bits: SELECT `0x0100`, L2 `0x01`, R2 `0x02`, L1 `0x04`, R1 `0x08`, up/right/down/left `0x1000/0x2000/0x4000/0x8000`.
+- RESULT screen cursor: `0x8019C3DA` (0 CONTINUE, 1 END, 2 CLEAR RESULT).
+
+**Patch (`src/stage.asm`).**
+- Line `L1 < STAGE: name > R1` at col 11, row 27, palette 5, Versus select only. It is drawn by the select handler (the old secret-code call block at `0x8013AA60` jumps to `xp_stagekey`) and erased on scene init with the X' marker.
+- R1 moves forward and L1 back, both wrapping, through NORMAL → RANDOM → MORRIGAN … AKUMA. Only P1 can change it, while still choosing; P2's handler only draws the line.
+- `xp_stage` replaces the `lbu` at `0x8012CCE0`. In a Versus match, NORMAL keeps vanilla, a fixed setting n gives stage n-2, and RANDOM draws one of the 10 stages. The draw uses an LCG stirred with root counters 0 and 1, excluding the stage of the previous match.
+- The setting starts at RANDOM, and `xp_title` resets it to RANDOM.
+- The code and its variables live at `0x801544E4`, a 996-byte function with no references (no `jal`, no pointer, no `lui`/`addiu` pair). Emulator coverage never reached it.
 
 ## 8. Design decisions
 
@@ -217,5 +236,6 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 3. **Versus handicap** (Difficulty 1-5) is kept, with vanilla behaviour: `x += floor(x/10) * (diff + 1)` when the opponent's level is higher.
 4. **Free play** is not applicable on console.
 5. **Bosses:** the `+0x6C` flag is irrelevant under X' (no Devilot/Akuma penalty any more).
-6. **Branding:** X' marker in matches, "X' BALANCE PATCH" on the title.
+6. **Branding:** X' marker in matches, "X' BALANCE PATCH BY ZANAC" on the title.
 7. **Mei-Ling / Anita labels** on the select screen (redrawn unused Japanese labels).
+8. **Versus stage (experimental):** the selector starts at RANDOM. The choice is kept between matches until the title screen comes back. RANDOM never repeats the stage of the previous match.

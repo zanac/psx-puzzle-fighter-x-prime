@@ -12,8 +12,10 @@ TEXT_DIRTY   equ 0x801667C0             ; text layer redraw counter
 MARKER_COL   equ 22                     ; X' between the win counters
 MARKER_ROW   equ 26
 MARKER_PAL   equ 5
-TITLE_COL    equ 15                     ; "X' BALANCE PATCH" on the title, under the copyright
+TITLE_COL    equ 11                     ; "X' BALANCE PATCH BY ZANAC" on the title, under the copyright
 TITLE_ROW    equ 28
+MODE         equ 0x8019C40F             ; game mode of the match (3 = Versus)
+MODE_NEXT    equ 0x8019C3FF             ; mode being set up (on the select screen)
 
 ; ============================================================================
 ; DROP PATTERNS  (table at 0x8016E684, 11 chars x 0xC0, rows bottom first)
@@ -289,7 +291,7 @@ xp_move:
 	sw      s0, 0x10(sp)
 	sw      ra, 0x14(sp)
 	andi    v0, a1, 0xF000
-	beqz    v0, @@ret
+	beqz    v0, xp_mv_ret
 	move    s0, a0
 	lbu     t0, 1(a2)                   ; cursor position
 	lb      t4, 0x73(s0)                ; player index
@@ -303,72 +305,72 @@ xp_move:
 	move    t9, zero                    ; bit to set in Anita bits
 	andi    a1, a1, 0xFFFF
 	li      v0, 0x1000                  ; up
-	beq     a1, v0, @@updown
+	beq     a1, v0, xp_up               ; (stage.asm: Up cycles back)
 	addiu   t1, t0, -4
 	li      v0, 0x8000                  ; left
-	beq     a1, v0, @@leftright
+	beq     a1, v0, xp_mv_leftright
 	addiu   t1, t0, -1
 	li      v0, 0x2000                  ; right
-	beq     a1, v0, @@leftright
+	beq     a1, v0, xp_mv_leftright
 	addiu   t1, t0, 1
 	li      v0, 0x4000                  ; down
-	bne     a1, v0, @@ret
+	bne     a1, v0, xp_mv_ret
 	addiu   t1, t0, 4
 	sltiu   v0, t0, 4
-	bnez    v0, @@updown                ; top row: plain move down
+	bnez    v0, xp_mv_updown                ; top row: plain move down
 	nop
 
 	; Down on the bottom row: cycle the character of this cell
 	lbu     t2, 0(a2)
 	li      v0, 10
-	bne     t2, v0, @@not_dan
+	bne     t2, v0, xp_mv_not_dan
 	slti    v0, t2, 8
 	li      t2, 4                       ; Dan -> Mei-Ling
-	b       @@apply
+	b       xp_mv_apply
 	move    t3, t5
-@@not_dan:
-	bnez    v0, @@not_secret
+xp_mv_not_dan:
+	bnez    v0, xp_mv_not_secret
 	li      v0, 4
-	b       @@apply
+	b       xp_mv_apply
 	addiu   t2, t2, 1                   ; Devilot -> Akuma -> Dan
-@@not_secret:
-	bne     t2, v0, @@not_meiling
+xp_mv_not_secret:
+	bne     t2, v0, xp_mv_not_meiling
 	and     v1, t7, t5
-	beqz    v1, @@not_meiling
+	beqz    v1, xp_mv_not_meiling
 	nop
 	li      t2, 5                       ; Mei-Ling -> Anita
-	b       @@apply
+	b       xp_mv_apply
 	move    t9, t5
-@@not_meiling:
+xp_mv_not_meiling:
 	li      v0, 5
-	bne     t2, v0, @@to_devilot
+	bne     t2, v0, xp_mv_to_devilot
 	and     v1, t8, t5
-	bnez    v1, @@cell_char             ; Anita -> cell character
+	bnez    v1, xp_mv_cell             ; Anita -> cell character
 	nop
-@@to_devilot:
-	b       @@apply
+xp_mv_to_devilot:
+	b       xp_mv_apply
 	li      t2, 8                       ; cell character -> Devilot
 
-@@leftright:                            ; stay on the same row
+xp_mv_leftright:                            ; stay on the same row
 	srl     v0, t1, 2
 	srl     v1, t0, 2
-	bne     v0, v1, @@ret
+	bne     v0, v1, xp_mv_ret
 	nop
-	b       @@moved
+	b       xp_mv_moved
 	nop
-@@updown:
+xp_mv_updown:
 	sltiu   v0, t1, 8
-	beqz    v0, @@ret
+	beqz    v0, xp_mv_ret
 	nop
-@@moved:
+xp_mv_moved:
 	sb      t1, 1(a2)
 	move    t0, t1
-@@cell_char:                            ; t0 = cursor position
+xp_mv_cell:                            ; t0 = cursor position
 	la      v0, CURSOR_CHARS
 	addu    v0, v0, t0
 	lbu     t2, 0(v0)
 
-@@apply:                                ; t2 = character, t3/t9 = alt bit to set
+xp_mv_apply:                                ; t2 = character, t3/t9 = alt bit to set
 	and     t7, t7, t6
 	or      t7, t7, t3
 	and     t8, t8, t6
@@ -387,17 +389,17 @@ xp_move:
 	lb      a0, 0x73(s0)                ; portrait / name
 	lb      a1, 0x74(s0)
 	lui     a2, 0x801B
-	bnez    a0, @@p2
+	bnez    a0, xp_mv_p2
 	nop
-	b       @@portrait
+	b       xp_mv_portrait
 	lb      a2, -0x1A93(a2)             ; P1 +0x6D (0x801AE56D)
-@@p2:
+xp_mv_p2:
 	lb      a2, -0x17E7(a2)             ; P2 +0x6D (0x801AE819)
-@@portrait:
+xp_mv_portrait:
 	nop                                 ; load delay
 	jal     0x8010789C
 	nop
-@@ret:
+xp_mv_ret:
 	lw      ra, 0x14(sp)
 	lw      s0, 0x10(sp)
 	jr      ra
@@ -411,8 +413,8 @@ xp_move:
 ; skipped and both places hold new code.
 ; ============================================================================
 .org 0x8013AA60
-	b       0x8013AACC              ; skip the secret-code detectors
-	nop
+	j       xp_stagekey             ; skip the secret-code detectors; the
+	nop                             ; Versus stage line runs here instead
 .area 0x8013AACC - 0x8013AA68, 0
 
 ; ---- title screen line, after the vanilla "TM" print (0x80126C40) ----
@@ -420,6 +422,9 @@ xp_move:
 ; the print routine (0x80107CB8) nor its callees use
 xp_title:
 	move    t8, ra
+	lui     t0, hi(xp_stg_setting)  ; back on the title: stage = RANDOM
+	li      t1, 1
+	sb      t1, lo(xp_stg_setting)(t0)
 	jal     0x80107CB8              ; vanilla print (a0..a2 untouched)
 	nop
 	li      a0, TITLE_COL
@@ -430,7 +435,7 @@ xp_title:
 	jr      t8
 	nop
 xp_title_text:
-	.ascii  "X' BALANCE PATCH"
+	.ascii  "X' BALANCE PATCH BY ZANAC"
 	.byte   0
 	.align  4
 .endarea
@@ -515,6 +520,8 @@ xp_marker_clear:
 	nop
 	jal     xp_marker_set
 	move    t3, zero
+	jal     xp_stage_erase          ; Versus stage line (t0-t3 only)
+	nop
 	jr      t8
 	nop
 .endarea
@@ -541,5 +548,9 @@ xp_marker_clear:
 .org 0x80126C40
 	jal     xp_title                ; title screen text
 
+.org 0x8012CCE0
+	jal     xp_stage                ; stage index (vanilla: lbu v0, 0x68(s2))
+
+.include "src/stage.asm"
 
 .close

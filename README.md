@@ -21,14 +21,15 @@ Hey dude! Help me out for a couple of :beers: or a :coffee:!<br/>
 - Devilot, Akuma and Dan selectable without codes
 - **PSX X' addition — Dan:** new "Gadoken" drop pattern (red spine: columns 1/3/5 red, mixed pairs between) instead of all red; sends 110 % and receives 110 %
 - `X'` marker in game
+- **Versus stage selector (experimental branch):** RANDOM (default), NORMAL or a fixed stage, chosen by P1 on the select screen
 
 ## Screenshots
 
-**Title screen.** "X' BALANCE PATCH" is shown under the copyright.
+**Title screen.** "X' BALANCE PATCH BY ZANAC" is shown under the copyright.
 
 ![Title screen](docs/screenshots/title.png)
 
-**Secret characters without codes.** On the bottom row, Down cycles the cell through Devilot → Akuma → Dan → Mei-Ling → Anita and back.
+**Secret characters without codes.** On the bottom row, Down cycles the cell through Devilot → Akuma → Dan → Mei-Ling → Anita and back; Up walks the same ring backwards.
 Mei-Ling and Anita get their own name labels, which the original select screen never had.
 
 ![Secret character cycle](docs/screenshots/select_cycle.png)
@@ -43,6 +44,14 @@ Mei-Ling and Anita get their own name labels, which the original select screen n
 
 ![Match with the X' marker](docs/screenshots/match.png)
 
+**Versus stage selector.** P1 picks the stage under the character grid with **R1** (next) and **L1** (previous). From left to right: RANDOM, then AKUMA, and the match that follows on Akuma's stage.
+
+![Stage selector: RANDOM, AKUMA, match on Akuma's stage](docs/screenshots/stage_selector.png)
+
+RANDOM changes the stage at every match:
+
+![Four RANDOM matches in a row](docs/screenshots/stage_random.png)
+
 ## Status
 
 Done:
@@ -51,36 +60,71 @@ Done:
 - **Damage formula.** It reproduces the arcade X' patch exactly. It was fuzz-tested in an emulator against a Python model of the arcade code.
 - **Diamond.** It always applies its penalty, so the diamond trick is gone.
 - **Character select.** Pressing Down on the bottom row cycles through Devilot, Akuma, Dan, Mei-Ling and Anita, and the select screen now has name labels for Mei-Ling and Anita.
-- **Markers.** `X'` appears between the win counters during matches, and "X' BALANCE PATCH" appears on the title screen.
+- **Markers.** `X'` appears between the win counters during matches, and "X' BALANCE PATCH BY ZANAC" appears on the title screen.
 - **Codes.** The old secret-character codes are disabled; cycling replaces them.
+- **Versus stage selector** (branch `experimental/random-stage`). It is described below.
+- **Output formats.** The patch and build scripts always write BIN + CUE and PBP, whatever the input.
 
 See [docs/RESEARCH.md](docs/RESEARCH.md) for the map of the PSX executable.
 
+## Versus stage selector (experimental)
+
+This feature is on the branch `experimental/random-stage`.
+
+In Versus, the character select shows a stage line under the grid. **P1** presses **R1** (next) or **L1** (previous), before confirming, to move through:
+
+`NORMAL → RANDOM → MORRIGAN → CHUN-LI → RYU → KEN → HSIEN-KO → DONOVAN → FELICIA → SAKURA → DEVILOT → AKUMA`
+
+- **RANDOM** is the default. It draws a new stage at every match and never repeats the stage of the previous match.
+- **NORMAL** is the vanilla behaviour: the stage of P1's character.
+- A **fixed stage** is used for every match.
+- Each stage brings its own music, as in vanilla.
+- The choice is kept from match to match (CONTINUE) and goes back to RANDOM when the title screen comes back.
+- In a 3-round match, the stage stays the same for every round.
+- Arcade, Street Puzzle and the demo are not changed.
+
+![Stage line on the select screen](docs/screenshots/stage_select.png)
+
+Details: [docs/PROPOSAL-random-stage.md](docs/PROPOSAL-random-stage.md), and section 7b of [docs/RESEARCH.md](docs/RESEARCH.md).
+
 ## Download and patching
 
-Get the zip from [Releases](https://github.com/zanac/psx-puzzle-fighter-x-prime/releases). It contains no game data. You need your own **Super Puzzle Fighter II Turbo, NTSC-U, SLUS-00418** image (single-track BIN or PBP) and Python 3; nothing else.
+Get the zip from [Releases](https://github.com/zanac/psx-puzzle-fighter-x-prime/releases). It contains no game data.
+
+You need two things:
+- Your own **Super Puzzle Fighter II Turbo, NTSC-U, SLUS-00418** image, as a BIN, a CUE (one or more BIN files, e.g. a Redump set) or a PBP.
+- Python 3. Nothing else is needed.
 
 ```sh
-./patch.sh original.bin  xprime.bin      # or
-./patch.sh original.pbp  xprime.pbp
-python3 tools/applypatch.py xprime-patch.json original.bin xprime.bin   # same, any OS
+./patch.sh original.pbp xprime        # or original.bin / original.cue
+python3 tools/applypatch.py xprime-patch.json original.pbp xprime   # same, any OS
 ```
 
-The output keeps the input's format. For BIN output, copy the original `.cue` and point its FILE line at the new `.bin`.
+Whatever the input, you always get all three outputs:
+
+| File | Use |
+|---|---|
+| `xprime.bin` + `xprime.cue` | one BIN with all 3 tracks (data + 2 CD audio) |
+| `xprime.pbp` | single-disc PBP |
+
+From a **PBP** input, the patched PBP keeps the original header and PSP loader, so it behaves like the original on a PSP.
+
+From a **BIN/CUE** input, the PBP is built from scratch without a `DATA.PSP`. It works in emulators, but a real PSP needs a PBP made with a PSP tool from the patched BIN/CUE.
+
+For a BIN input without a `.cue` beside it, the track layout comes from the known layout of this disc.
 
 The patcher checks the SHA-1 of every file it changes, before and after, so a different version or a modified image is rejected.
-Tested on PCSX ReARMed; reports from other emulators or real hardware are welcome.
+Tested on PCSX ReARMed with all three outputs; reports from other emulators or real hardware are welcome.
 
 ## Building from source
 
 ```sh
-./build.sh original.pbp  xprime.pbp  [path/to/armips]
-./build.sh original.bin  xprime.bin  [path/to/armips]
+./build.sh original.pbp  xprime  [path/to/armips]     # or original.bin / original.cue
 ```
 
 The input must be the original NTSC-U SLUS-00418; the script checks the
-executable's hash. The output has the same format as the input. For BIN
-output, reuse the original `.cue` and rename the file inside it if needed.
+executable's hash. As with `patch.sh`, it writes `xprime.bin`, `xprime.cue`
+and `xprime.pbp`.
 
 Needs `python3` and [armips](https://github.com/Kingcom/armips).
 
@@ -88,17 +132,30 @@ Needs `python3` and [armips](https://github.com/Kingcom/armips).
 
 On the character select screen, move to the bottom row and keep pressing
 **Down**: the character on that cell cycles through Devilot, Akuma, Dan,
-Mei-Ling and Anita, then back. Up, Left or Right return to the normal grid.
+Mei-Ling and Anita, then back to the cell's own character. While a secret
+character is shown, **Up** goes back one step in the same ring (Anita →
+Mei-Ling → Dan → Akuma → Devilot → the cell's character). On the cell's own
+character, Up moves to the top row as usual; Left or Right return to the
+normal grid.
 As in vanilla, the button used to confirm picks the colours: Circle or
 Triangle give the standard colours, Cross or Square the alternate ones.
 
 Mei-Ling and Anita keep Hsien-Ko's and Donovan's portrait on the select
 screen, with their own name label; they appear as themselves in the match.
 
+## How to choose the Versus stage
+
+On the Versus character select, before confirming the character, P1 presses
+**R1** to go to the next setting or **L1** to go back. The line
+`L1 < STAGE: name > R1` under the grid shows the setting (NORMAL, RANDOM or
+a stage name). RANDOM is already selected when you enter Versus.
+P2's L1/R1 do nothing.
+
 ## Tools
 
 | Path | Purpose |
 |---|---|
+| `tools/discout.py` | disc input (BIN, CUE, PBP) and output (BIN + CUE + PBP); also converts between them |
 | `tools/pbp2bin.py` | PSX PBP (PSISOIMG) → BIN/CUE |
 | `tools/psxiso.py` | list / extract the ISO9660 file system of a raw BIN |
 | `tools/findpat.py` | scan a file for drop-pattern-shaped tables |
@@ -109,6 +166,7 @@ screen, with their own name label; they appear as themselves in the match.
 | `tools/previews.py` | redraw the Counter Gem previews from the EXE table |
 | `tools/lzh.py` | codec for the sprite-graphics LZ (decoder `0x8010D5C0`) |
 | `tools/labels.py` | builds the MEI-LING / ANITA select-screen labels in FIRST.EMI |
+| `src/stage.asm` | Versus stage selector (included by `src/xprime.asm`) |
 | `tools/regress.py` | end-to-end regression in the emulator (screens, damage, secrets) |
 | `tools/model.py` | Python model of the arcade X' damage formula (for tests) |
 | `tools/lr.py` | headless libretro frontend (input scripting, RAM access, savestates, screenshots, watchpoints) |
