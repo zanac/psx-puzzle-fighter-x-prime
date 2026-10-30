@@ -22,6 +22,29 @@ index b0c262d..3c97094 100644
     local: *;
  };
  
+diff --git a/libpcsxcore/cdrom.c b/libpcsxcore/cdrom.c
+index 11c435f..95120df 100644
+--- a/libpcsxcore/cdrom.c
++++ b/libpcsxcore/cdrom.c
+@@ -574,6 +574,10 @@ static u32 cdrAlignTimingHack(u32 cycles)
+ 
+ static void cdrUpdateTransferBuf(const u8 *buf);
+ static void cdrReadInterrupt(void);
++/* xdbg: CdlSetfilter log (file<<24 | channel<<16 | low 16 bits of the play LBA) */
++unsigned int xdbg_cd_filters[64]; unsigned int xdbg_cd_nfilters;
++__attribute__((visibility("default"))) unsigned int *xdbg_cd_log(unsigned int *n) { *n = xdbg_cd_nfilters; return xdbg_cd_filters; }
++__attribute__((visibility("default"))) unsigned int xdbg_cd_lba(void) { return msf2sec(cdr.SetSectorPlay); }
+ static void cdrPrepCdda(s16 *buf, int samples);
+ 
+ static void msfiAdd(u8 *msfi, u32 count)
+@@ -991,6 +995,7 @@ void cdrInterrupt(void) {
+ 		case CdlSetfilter:
+ 			cdr.FilterFile = cdr.Param[0];
+ 			cdr.FilterChannel = cdr.Param[1];
++			xdbg_cd_filters[xdbg_cd_nfilters++ & 63] = (cdr.FilterFile << 24) | (cdr.FilterChannel << 16) | (msf2sec(cdr.SetSectorPlay) & 0xffff);
+ 			cdr.FileChannelSelected = 0;
+ 			break;
+ 
 diff --git a/libpcsxcore/psxinterpreter.c b/libpcsxcore/psxinterpreter.c
 index 900c0cd..4da03cd 100644
 --- a/libpcsxcore/psxinterpreter.c

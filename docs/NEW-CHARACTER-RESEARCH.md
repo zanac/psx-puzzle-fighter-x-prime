@@ -88,9 +88,14 @@ Both games use the same XA format: 8 interleaved channels, stereo, 37.8 kHz, 4-b
 - Pocket Fighter: `KYOKU/XA00-04.XA`.
 - SPF2T: `STR/ORG00-02.XA` and `STR/QSD00-02.XA`.
 
-So Zangief's theme can be copied **sector for sector** into a new XA file for SPF2T. Still to do:
-- find which file and channel holds his theme (by tracing the CD filter calls in a Pocket Fighter match on his stage);
-- find how SPF2T maps a stage to its XA file and channel.
+So Zangief's theme can be copied **sector for sector** into a new XA file for SPF2T.
+
+**Tracing the music.** The instrumented core now logs every `CdlSetfilter`. `xdbg_cd_log()` returns `file << 24 | channel << 16 | low bits of the LBA`, and `xdbg_cd_lba()` returns the current read position.
+- A Pocket Fighter channel holds several songs back to back. The song is chosen by the start position, not only by the channel.
+- Free Battle always plays on the same stage, whatever the characters. Its music is file 1 (`XA00`), channel 0, from about LBA 344.
+- To get **Zangief's own** stage and theme, an Arcade match against him is needed (his home stage). That is planned for step 6, with the same tracing.
+
+Also still to do: how SPF2T maps a stage to its XA file, channel and start.
 
 ## Voices
 
