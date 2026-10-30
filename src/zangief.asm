@@ -375,6 +375,58 @@ xp_zpal:
 
 .endarea
 
+; ---- voices (step 4) ----
+; voice bank load (0x801058D0, a0 = player): Zangief loads SE_PL0B.EMI
+; (second new file) with his own "loaded bank" cache value. Code space:
+; 0x8015C550, a 380-byte function with no references that never runs.
+ZG_SEFILE equ 0x57
+ZG_SEGROUP equ 0x20              ; voice cache value (11 is the cache's "none")
+.org 0x8015C550
+.area 0x17C, 0
+; replaces 0x8010594C-0x80105980: s0 = character (maybe already 9 for the
+; vanilla Dan -> Akuma voice case), s1 = cache byte, a1 = bank descriptor
+xp_zse:
+	li      at, 1
+	sllv    at, at, a0
+	lui     v0, hi(XP_ZBITS)
+	lbu     v0, lo(XP_ZBITS)(v0)
+	nop
+	and     v0, v0, at
+	beqz    v0, @@cache
+	li      v1, 0x801AE568          ; P1 character
+	beqz    a0, @@char
+	nop
+	li      v1, 0x801AE814          ; P2 character
+@@char:
+	lb      v1, 0(v1)
+	li      at, ZG_CHAR
+	bne     v1, at, @@cache
+	nop
+	li      s0, ZG_SEGROUP
+@@cache:
+	lb      v0, 0(s1)
+	nop
+	beq     v0, s0, @@done
+	nop
+	jal     0x80105760
+	move    a0, a1
+	li      at, ZG_SEGROUP
+	beq     s0, at, @@load
+	li      a0, ZG_SEFILE
+	sll     v0, s0, 2
+	la      at, 0x80165FE0
+	addu    at, at, v0
+	lw      a0, 0(at)
+@@load:
+	jal     0x801043C0
+	nop
+	j       0x80105980
+	nop
+@@done:
+	j       0x80105984
+	nop
+.endarea
+
 ; hooks only when the build has Zangief's file (XP_PF in build.sh);
 ; otherwise he keeps Dan's in-match look
 .if ZG_HAVE
@@ -398,5 +450,8 @@ xp_zpal:
 	nop
 	nop
 	nop
+	nop
+.org 0x8010594C
+	j       xp_zse
 	nop
 .endif

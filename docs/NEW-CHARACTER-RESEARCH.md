@@ -212,3 +212,31 @@ So Zangief can keep Dan's state machine and attack code, with his own list of sc
 - Zangief vs Zangief, Dan vs Zangief, Zangief vs Akuma: both sprites and palettes correct.
 - After a match, the loser switching from Zangief to Dan gets Dan's graphics again.
 - Damage fuzz 120/120 with Zangief; full regression passes on the `XP_PF` build and on the plain build (which also reproduces `xprime-patch.json`).
+
+## Step 4: voices (done)
+
+**SPF2T voice bank** (`SE_PLxx.EMI`, file ids `0x3E + n`): 3 entries.
+- Entry 0: the sound id table, 8 bytes per id. Byte 3 is the program; the high nibble of byte 5 is the tone. Ids 0–23 are the 24 samples; 25–33 replay some of them with other parameters.
+- Entry 1: the VAB header (Dan: 2 programs, 24 tones, 11.025 kHz samples: note = 48 + n, center = note + 24).
+- Entry 2: the VAG body.
+
+The loader is `0x801058D0 (player)`. It keeps a per-player cache byte (`0x801BF118/9`), and its value 11 means "none loaded". Voices are played through `0x80105C4C`, with flag 1 for P1's bank and 0x42 for P2's.
+
+**Dan's voice ids in play** (traced): 30–33 come with the attack states (30 also starts the super), 19/20 with the hit reaction (state 6), 27 when the opponent is knocked out, 28 after the win, 23 for the lose, and 4–7, 10 and 13 during play.
+
+**Pocket Fighter.** Character n's voices are in `/SE/SE(n+1)A.PAC` (Zangief: `SE0AA.PAC`; B is the same for P2, C adds the costume voices). PAC entries:
+- a 256 × 4-byte sound table (byte 1 = program, high nibble of byte 2 = tone);
+- the VAB header: 3 programs, 31 VAGs, 8 kHz (note + 30 = center, shift 57);
+- the VAG body.
+
+Sound codes `0xAxx` in his animations name voices: 0x16 is the Double Lariat shout (VAG 23), 0x14 his taunt (VAG 21), 0x1C the special (VAG 29), and 0x33/0x1D the bear (VAGs 17/30). VAGs never used by an animation (4, 7–13, 31) are played by code: hits, K.O., win.
+
+**Build.** `zangief.py voices` writes `SE_PL0B.EMI` (new file id 0x57). It is Dan's layout with Zangief's VAGs copied raw into Dan's 24 slots (`VOICE_MAP`); each tone gets center = note + 30 and shift 57, so the 8 kHz samples play at their own pitch. The hook at `0x8010594C` (`xp_zse`, code at `0x8015C550`, an unreferenced 380-byte function that never runs) loads it for Zangief, with cache value 0x20.
+
+**Checks.**
+- In a Zangief match his bank is resident in SPU RAM (all 56 sampled chunks of `SE_PL0B`, none of Dan's).
+- The captured match audio matches his samples at the moments the game plays ids 31 and 32 (correlation 0.48 and 0.74).
+- After switching Zangief → Dan, Dan's bank is back.
+- Damage fuzz 120/120; full regression passes; the plain build still reproduces `xprime-patch.json`.
+
+**Open.** Some slot roles are guesses (the samples cannot be listened to here); `VOICE_MAP` is one table to adjust by ear.

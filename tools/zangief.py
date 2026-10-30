@@ -24,6 +24,7 @@ The Spinning Piledriver frames get a vertical lift (jumps are object motion in
 Pocket Fighter, not part of the frames).
 
 usage: zangief.py ZANGIEF.PAC PL09A.MDL FIRST.EMI PL9A_OBJ.EMI OUT.EMI [--sheet PNG]
+       zangief.py voices SE0AA.PAC SE_PL0A.EMI OUT.EMI [--wav DIR]   (SE_PL0B.EMI)
 """
 import os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -310,8 +311,94 @@ def build(pac, mdl, first, template, sheet=None):
         S.save(sheet)
     return bytes(out), len(recs), len(gfx), len(e1)
 
+# --- voices (step 4) -----------------------------------------------------------
+# SE_PL0B.EMI = Dan's SE_PL0A.EMI layout (sound id table, VAB header, VAG
+# body) with Zangief's Pocket Fighter samples (PF /SE/SE0AA.PAC) in Dan's 24
+# slots. Dan's slot roles come from the voice ids the game plays (see
+# docs/NEW-CHARACTER-RESEARCH.md); Zangief's from Pocket Fighter's own use.
+# Pocket Fighter's samples are 8 kHz: each tone gets center = note + 30 and
+# shift 57, as in Pocket Fighter's own VAB (SPF2T's are 11.025 kHz).
+VOICE_MAP = {   # Dan VAG slot (1-24) -> Zangief VAG (SE0AA, 1-31)
+    1: 30, 2: 31,
+    3: 5,       # attack (id 31): punch shout
+    4: 28,      # attack / super start (id 30)
+    5: 26,      # attack (id 32)
+    6: 13, 7: 10,
+    8: 21,      # opponent knocked out (id 27): his taunt line
+    9: 4,       # win (id 28)
+    10: 15, 11: 11, 12: 16, 13: 18, 14: 14, 15: 19, 16: 20,
+    17: 17,     # bear
+    18: 24,
+    19: 23,     # attack (id 33): Double Lariat shout
+    20: 8, 21: 9,   # hit reactions (ids 19, 20)
+    22: 27, 23: 29,
+    24: 12,     # lose (id 23)
+}
+
+def emi_entries(d):
+    out, off = [], 0x800
+    n = struct.unpack_from('<I', d, 0)[0]
+    for i in range(1, n + 1):
+        size = struct.unpack_from('<I', d, 16 * i)[0]
+        out.append((off, size))
+        off += (size + 0x7FF) & ~0x7FF
+    return out
+
+def build_voices(pf_se, dan_se):
+    import vab
+    zvh = vab.parse_vh(pf_se, 0x1000)
+    zvb_off = 0x1000 + ((zvh['hdr_end'] + 0x7FF) & ~0x7FF)
+    zvags = vab.vags(zvh, pf_se[zvb_off:])
+    (o0, s0), (o1, s1), (o2, s2) = emi_entries(dan_se)
+    vh = bytearray(dan_se[o1:o1 + s1])
+    dvh = vab.parse_vh(dan_se, o1)
+    body = bytearray()
+    sizes = [0] * 256
+    for slot in range(1, dvh['vs'] + 1):
+        v = zvags[VOICE_MAP[slot] - 1]
+        v = v + bytes(-len(v) % 16)
+        body += v
+        sizes[slot] = len(v) >> 3
+    # tones: 8 kHz samples
+    tbase = 32 + 128 * 16
+    for i, t in enumerate(dvh['tones']):
+        if t['vag'] <= 0:
+            continue
+        p = tbase + 32 * i
+        vh[p + 4] = t['min'] + 30           # center
+        vh[p + 5] = 57                      # shift
+    struct.pack_into('<256H', vh, tbase + dvh['ps'] * 16 * 32, *sizes)
+    struct.pack_into('<I', vh, 12, len(vh) + len(body))      # file size
+    out = bytearray(dan_se[:0x800])
+    struct.pack_into('<I', out, 48, len(body))                # entry 2 size
+    out[0x800:] = dan_se[o0:o0 + s0] + bytes(-s0 % 0x800)
+    out += vh + bytes(-len(vh) % 0x800)
+    out += body + bytes(-len(body) % 0x800)
+    return bytes(out)
+
+def voices_main(a):
+    # zangief.py voices SE0AA.PAC SE_PL0A.EMI OUT.EMI [--wav DIR]
+    rd = lambda p: open(p, 'rb').read()
+    out = build_voices(rd(a[0]), rd(a[1]))
+    open(a[2], 'wb').write(out)
+    print('voices: %d bytes' % len(out))
+    if '--wav' in a:
+        import vab
+        d = a[a.index('--wav') + 1]
+        os.makedirs(d, exist_ok=True)
+        pf = rd(a[0]); zvh = vab.parse_vh(pf, 0x1000)
+        zvags = vab.vags(zvh, pf[0x1000 + ((zvh['hdr_end'] + 0x7FF) & ~0x7FF):])
+        for i, v in enumerate(zvags):
+            vab.wav(os.path.join(d, 'zangief_%02d.wav' % (i + 1)), vab.decode_vag(v), 8000)
+        dan = rd(a[1]); (o0, s0), (o1, s1), (o2, s2) = emi_entries(dan)
+        dvh = vab.parse_vh(dan, o1)
+        for i, v in enumerate(vab.vags(dvh, dan[o2:o2 + s2])):
+            vab.wav(os.path.join(d, 'dan_%02d.wav' % (i + 1)), vab.decode_vag(v), 11025)
+
 if __name__ == '__main__':
     a = sys.argv[1:]
+    if a and a[0] == 'voices':
+        voices_main(a[1:]); sys.exit(0)
     if len(a) < 5:
         print(__doc__); sys.exit(1)
     sheet = a[a.index('--sheet') + 1] if '--sheet' in a else None

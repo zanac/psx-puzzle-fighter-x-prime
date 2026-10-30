@@ -31,14 +31,18 @@ python3 "$HERE/tools/checkexe.py" "$TMP/SLUS_004.18"
 NEWFILES=${XP_NEWFILES:-}
 ZG_HAVE=0
 if [ -n "${XP_PF:-}" ]; then
-	# Zangief's in-match file, from Pocket Fighter (first new file: id 0x56)
+	# Zangief's in-match file, from Pocket Fighter (new file ids 0x56, 0x57)
 	python3 "$HERE/tools/extract.py" "$XP_PF" /PLAYER/ZANGIEF.PAC "$TMP/ZANGIEF.PAC"
 	python3 "$HERE/tools/extract.py" "$XP_PF" /MDL/PL09A.MDL "$TMP/PL09A.MDL"
 	python3 "$HERE/tools/extract.py" "$IN" /DATA/FIRST.EMI "$TMP/FIRST.EMI"
 	python3 "$HERE/tools/extract.py" "$IN" /DATA/PL9A_OBJ.EMI "$TMP/PL9A_OBJ.EMI"
 	python3 "$HERE/tools/zangief.py" "$TMP/ZANGIEF.PAC" "$TMP/PL09A.MDL" \
 		"$TMP/FIRST.EMI" "$TMP/PL9A_OBJ.EMI" "$TMP/PL0B_OBJ.EMI"
-	NEWFILES="PL0B_OBJ.EMI=$TMP/PL0B_OBJ.EMI $NEWFILES"
+	# his voices (second new file: id 0x57)
+	python3 "$HERE/tools/extract.py" "$XP_PF" /SE/SE0AA.PAC "$TMP/SE0AA.PAC"
+	python3 "$HERE/tools/extract.py" "$IN" /DATA/SE_PL0A.EMI "$TMP/SE_PL0A.EMI"
+	python3 "$HERE/tools/zangief.py" voices "$TMP/SE0AA.PAC" "$TMP/SE_PL0A.EMI" "$TMP/SE_PL0B.EMI"
+	NEWFILES="PL0B_OBJ.EMI=$TMP/PL0B_OBJ.EMI SE_PL0B.EMI=$TMP/SE_PL0B.EMI $NEWFILES"
 	ZG_HAVE=1
 fi
 # file table: original files, moved CD-DA tracks, new files (src/files.asm)

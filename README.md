@@ -134,7 +134,7 @@ Needs `python3` and [armips](https://github.com/Kingcom/armips).
 
 **Experimental (branch `experimental/new-character`): Zangief.** Set `XP_PF`
 to your own Pocket Fighter NTSC-U image (SLUS-00653) to build Zangief's in-match
-graphics and animations from it:
+graphics, animations and voices from it:
 
 ```sh
 XP_PF="Pocket Fighter.cue" ./build.sh original.pbp xprime [path/to/armips]
@@ -142,7 +142,7 @@ XP_PF="Pocket Fighter.cue" ./build.sh original.pbp xprime [path/to/armips]
 
 Nothing from Pocket Fighter is stored in this repository; the build extracts
 it from your disc. Without `XP_PF` (and with `patch.sh`), Zangief keeps Dan's
-look in the match.
+look and voice in the match.
 
 ## How to play the secret characters
 
