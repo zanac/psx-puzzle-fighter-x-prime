@@ -661,8 +661,11 @@ xp_zselload:
 	sb      zero, 0(at)
 	jal     0x801043C0
 	nop
-	lui     v0, hi(XP_ZOKN)
+	lui     v0, hi(XP_ZOK)          ; Versus / Arcade (an Arcade challenge's
+	lbu     at, lo(XP_ZOK)(v0)      ; select has MODE_NEXT 0: XP_ZOKN 0)
 	lbu     v0, lo(XP_ZOKN)(v0)
+	nop
+	or      v0, v0, at
 	li      at, 3
 	bne     v0, at, @@done
 	lui     at, hi(CACHE_P1)

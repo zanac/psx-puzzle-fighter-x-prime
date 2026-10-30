@@ -152,13 +152,18 @@ xp_cursorchars:                         ; CURSOR_CHARS + positions 8, 9
 .align 4
 
 ; spawn (end of 0x8013C29C, s0 = mode, its frame still on the stack): the
-; two extra icons in Versus / Arcade
+; two extra icons on the Versus / Arcade select screen (mode 3)
 xp_icons:
-	lui     v0, hi(XP_ZOKN)
+	lui     v0, hi(XP_ZOK)             ; Versus / Arcade, Arcade challenge included
+	lbu     at, lo(XP_ZOK)(v0)
 	lbu     v0, lo(XP_ZOKN)(v0)
+	nop
+	or      v0, v0, at
 	li      v1, 3
 	bne     v0, v1, @@ret
-	li      a0, 8
+	nop
+	bne     s0, v1, @@ret           ; mode 3 only: the select screen (mode 1 is
+	li      a0, 8                   ; Arcade's STAGE screen, its "?" cards)
 	jal     0x80114260
 	move    a1, s0
 	li      a0, 9
@@ -221,6 +226,9 @@ xp_iconanim:
 .org 0x80163574
 .area 0x80163644 - 0x80163574, 0
 
+; (XP_ZOK | XP_ZOKN is 3 in Versus and Arcade: XP_ZOKN alone is 0 on the
+; select screen of an Arcade challenge, where MODE_NEXT stays 0)
+
 ; xp_selchk: t0 = cursor position, a1 = pad (masked in the delay slot)
 xp_selchk:
 	sltiu   v0, t0, 8
@@ -251,8 +259,11 @@ xp_up_top:
 	addiu   v0, t0, -1
 	sltiu   v0, v0, 2               ; Chun-Li or Sakura?
 	beqz    v0, @@vanilla
-	lui     v0, hi(XP_ZOKN)
+	lui     v0, hi(XP_ZOK)             ; Versus / Arcade, Arcade challenge included
+	lbu     at, lo(XP_ZOK)(v0)
 	lbu     v0, lo(XP_ZOKN)(v0)
+	nop
+	or      v0, v0, at
 	nop
 	xori    v0, v0, 3
 	bnez    v0, @@vanilla
@@ -284,8 +295,11 @@ xp_cellchar:
 xp_ringnext:
 	li      v0, ZG_CHAR
 	bne     t2, v0, @@apply
-	lui     v0, hi(XP_ZOKN)
+	lui     v0, hi(XP_ZOK)             ; Versus / Arcade, Arcade challenge included
+	lbu     at, lo(XP_ZOK)(v0)
 	lbu     v0, lo(XP_ZOKN)(v0)
+	nop
+	or      v0, v0, at
 	nop
 	xori    v0, v0, 3
 	bnez    v0, @@apply
@@ -296,42 +310,13 @@ xp_ringnext:
 	j       xp_mv_apply
 	nop
 
-; xp_samechar: confirming a character the other player already has gives
-; the second one the other colour set (0x8013B058). Dan and Zangief are
-; both character 10: unless both are Zangief or both Dan, they count as
-; different. Replaces "lb v1, 0x74(s1)" at 0x8013B05C (a0 = the other
-; player's character, s0 / s1 = other / this select struct). Out: v1 =
-; this character, or -1. Keeps v0 (the colour set). Uses at, t0-t2.
-xp_samechar:
-	lb      v1, 0x74(s1)
-	li      at, ZG_CHAR
-	bne     v1, at, @@ret
-	nop
-	bne     a0, at, @@ret
-	lui     t0, hi(XP_ZOKN)
-	lbu     t0, lo(XP_ZOKN)(t0)
-	nop
-	xori    t0, t0, 3
-	bnez    t0, @@ret
-	lui     t0, hi(XP_ZBITS)
-	lbu     t0, lo(XP_ZBITS)(t0)
-	lb      t1, 0x73(s0)
-	lb      t2, 0x73(s1)
-	srlv    t1, t0, t1
-	srlv    t2, t0, t2
-	xor     t1, t1, t2
-	andi    t1, t1, 1
-	beqz    t1, @@ret
-	nop
-	li      v1, -1
-@@ret:
-	jr      ra
-	nop
-
 ; xp_ringprev: Up on Mei-Ling (t2 = ZG_CHAR): Dan, or Akuma in Versus / Arcade
 xp_ringprev:
-	lui     v0, hi(XP_ZOKN)
+	lui     v0, hi(XP_ZOK)             ; Versus / Arcade, Arcade challenge included
+	lbu     at, lo(XP_ZOK)(v0)
 	lbu     v0, lo(XP_ZOKN)(v0)
+	nop
+	or      v0, v0, at
 	nop
 	xori    v0, v0, 3
 	bnez    v0, @@apply
@@ -355,8 +340,11 @@ xp_pkey:
 	andi    v0, s1, 0xFF
 	li      at, ZG_CHAR
 	bne     v0, at, @@ret
-	lui     at, hi(XP_ZOKN)
+	lui     at, hi(XP_ZOK)             ; Versus / Arcade, Arcade challenge included
+	lbu     t8, lo(XP_ZOK)(at)
 	lbu     at, lo(XP_ZOKN)(at)
+	nop
+	or      at, at, t8
 	nop
 	xori    at, at, 3
 	bnez    at, @@ret
@@ -387,6 +375,46 @@ xp_portcmp:
 @@diff:
 	jr      ra
 	li      v0, -1
+
+.endarea
+
+; 0x80152D60 (128 bytes): a function with no references that never runs
+.org 0x80152D60
+.area 0x80152DE0 - 0x80152D60, 0
+; xp_samechar: confirming a character the other player already has gives
+; the second one the other colour set (0x8013B058). Dan and Zangief are
+; both character 10: unless both are Zangief or both Dan, they count as
+; different. Replaces "lb v1, 0x74(s1)" at 0x8013B05C (a0 = the other
+; player's character, s0 / s1 = other / this select struct). Out: v1 =
+; this character, or -1. Keeps v0 (the colour set). Uses at, t0-t2.
+xp_samechar:
+	lb      v1, 0x74(s1)
+	li      at, ZG_CHAR
+	bne     v1, at, @@ret
+	nop
+	bne     a0, at, @@ret
+	lui     t0, hi(XP_ZOK)             ; Versus / Arcade, Arcade challenge included
+	lbu     t1, lo(XP_ZOK)(t0)
+	lbu     t0, lo(XP_ZOKN)(t0)
+	nop
+	or      t0, t0, t1
+	nop
+	xori    t0, t0, 3
+	bnez    t0, @@ret
+	lui     t0, hi(XP_ZBITS)
+	lbu     t0, lo(XP_ZBITS)(t0)
+	lb      t1, 0x73(s0)
+	lb      t2, 0x73(s1)
+	srlv    t1, t0, t1
+	srlv    t2, t0, t2
+	xor     t1, t1, t2
+	andi    t1, t1, 1
+	beqz    t1, @@ret
+	nop
+	li      v1, -1
+@@ret:
+	jr      ra
+	nop
 
 ; store (0x801145F0: j 0x80114628 / sb s1, 0x58(s0)): the key
 xp_portstore:
