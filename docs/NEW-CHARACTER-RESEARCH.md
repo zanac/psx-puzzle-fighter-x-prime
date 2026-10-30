@@ -190,7 +190,7 @@ So Zangief can keep Dan's state machine and attack code, with his own list of sc
 **Build.** `XP_PF=<Pocket Fighter image> ./build.sh …` runs `tools/zangief.py`, which writes `PL0B_OBJ.EMI` (new file id 0x56) from `/PLAYER/ZANGIEF.PAC` and `/MDL/PL09A.MDL` on the user's disc.
 - Frames: Pocket Fighter records composited with their costume overlay, kept facing left (the game mirrors P1), scaled to 0.65 around the feet, quantised to one 15-colour palette. 42 frames, 0xEAA0 bytes of graphics. The Piledriver frames get a vertical lift.
 - Record entry, loaded at the player's bank (P1 `0x800E7600`, P2 `0x800EBB00`): 44-byte records, then at +0x2C00 the palette block (4 colour sets × 4 palettes: Zangief + Dan's 3 effect palettes), then at +0x2E00 the 51 state offsets and the 16-byte scripts.
-- Colour sets follow the confirm button like the others: set 1 (X) is the original red, then blue, green and dark. A Zangief facing Dan or another Zangief in P2 gets the alternate set, as for any same-slot match-up.
+- Colour sets follow the confirm button like the others: set 0 (Circle / Triangle, the standard colours for every character) is the original red, set 1 (Cross / Square) blue, then green and dark. (Before experimental-arcade set 1 was the red one, so he was the only character whose standard button gave the alternate colours.) A Zangief facing another Zangief gets the alternate set, as for any mirror match; facing Dan (the same slot) he no longer does (xp_samechar).
 
 **Hooks** (`src/zangief.asm`, code at `0x80151AC0`, an unreferenced 440-byte function that never runs; installed only when the build has the file):
 
@@ -296,7 +296,7 @@ Everything below is only active in Versus with Zangief's bit set, and only in bu
   - `xp_zselst` gives him his own state 23/24 scripts from his file (23 = stance, 24 = arms up).
   - `xp_zselbank` (at `0x8013648C`) gives him his banks.
   - `xp_zchibipal` (at `0x8010789C`) gives him his palette, colour set as chosen.
-  - While the cursor is on him, his own colours are shown (set 1). The cursor-move call is told apart by its return address, `xp_mv_ret`.
+  - While the cursor is on him, his own colours are shown (set 0). The cursor-move call is told apart by its return address, `xp_mv_ret`.
 
 ### Names
 
@@ -582,7 +582,7 @@ Seen in the emulator with a forced win in every match. The RAM pokes are below; 
 - **Zangief as the 13th.** He is part of the cast now, so he appears whoever the player is.
   - **His file.** `xp_zhbusy` replaces the wait at `0x80144028`. After `HARD_END.EMI`, it loads his own `PL0B_OBJ.EMI` into what the ENDING file left in RAM, which nothing uses then (graphics `0x80070000`, records `0x80082000`).
   - **Spawning and init.** The spawner makes 13 objects. `xp_zhinit` (at `0x8011ED40`) gives index 12:
-    - his idle script and his own colours (palette set 1, into bank 3 slot 12);
+    - his idle script and his own colours (palette set 0, into bank 3 slot 12);
     - the back row's middle gap, under the logo (x 184);
     - priority 11 (behind everyone, as the back row's big man);
     - a delay of 260 frames: last, but his 42-frame fade-in must end before the 336-frame landing timer, or he never lands and stays half faded.
@@ -603,6 +603,9 @@ and the Versus RESULT table lists them with separate counters. Code:
 
 - **Counters.** 4 arrays × 11 words at 0x801D2678: wins side 0, wins side 1 (+0x2C), losses side 0 (+0x58), losses side 1 (+0x84); index = character. Zangief has his own 4 words (XP_ZST), updated instead of Dan's when his bit is set (xp_zinc, replacing the update at 0x801382B8).
 - **Lines.** A 12th line, ZANGIEF; DAN and ZANGIEF are always shown, AKUMA and DEVILOT when unlocked (12-entry copies of the name, column and line tables). Totals go from row 19 to 20, the menu from rows 22/24/26 to 23/25/27.
+- **Card block.** The save is one 0x400-byte block built at 0x80010000 (card frame 0x2000 in a fresh card: 0x200 of header and icon, then the game data). The counters are at +0x268 (44 words), copied back by 0x80104054, which also runs at boot (the game loads the card by itself).
+- **Dan on the card.** Vanilla zeroes a secret character's counters before saving when it was only reached by its code this session (Dan: 0x80103F04, flag 0x8016CAFA clear, "used" 0x801BF120 set). Dan is listed like everyone now, so that step is skipped (0x80103F10 branches over it).
+- **Tested in the emulator with a memory card** (pcsx_rearmed option `pcsx_rearmed_memcard1 = libretro`; lr.py has no card unless it is passed). Zangief beats Dan, then BACKUP → SAVE DATA. On a fresh boot with that card, ZANGIEF 1 / DAN 1 come back; one more match gives 2 / 2.
 - **Save.** His counters go in the unused tail of the save block (+0x380: 'ZGST', 4 words, sum), written by xp_rssave and read back by xp_rsload; an older save gives zero. CLEAR RESULT clears them too.
 
 ### Icon grid
@@ -618,8 +621,9 @@ and the Versus RESULT table lists them with separate counters. Code:
 - **Positions.** 0–3 top row, 4–7 bottom row; 8 = Zangief, 9 = Dan. The cursor/badge position table 0x8016A974 is relocated with two more entries (read at 0x80116150, 0x8011618C, 0x801161B8). Position → character goes through a 10-entry copy of CURSOR_CHARS; position 8 also sets his bit.
 - **Moves** (xp_move): Up on Chun-Li (1) / Sakura (2) → 8 / 9, only in Versus/Arcade; on 8/9, Down → 1/2, Left/Right swap.
 - **Down ring.** In Versus/Arcade it becomes Devilot → Akuma → Mei-Ling → Anita → cell; Street Puzzle keeps Dan after Akuma.
+- **Mirror colours.** Confirming the character the other player already has gives the second one the other colour set (0x8013B058). Dan and Zangief are both character 10, so xp_samechar (0x8013B05C) makes them count as different unless both are Zangief or both Dan.
 - **Big portrait.** The portrait object (0x80114510) redraws only when the character differs from the one it shows (+0x58). Dan and Zangief are both character 10, so +0x58 now holds a key, character | 0x10 for Zangief.
-- **Logo and timers.** The logo's tile script (0x8016FACC) goes from row 5 to row 2. Arcade's STAGE n / FINAL STAGE scripts and digits move up by the same 3 rows, and their erase (0x8013CB38) covers rows 2–11. The select timers (0x8013C428 / 0x8013C4B4) move one column outwards.
+- **Logo and timers.** The logo's tile script (0x8016FACC) goes from row 5 to row 2; row 1 would be cut by the top of the visible area, so for a little more room the whole grid (icons, cursors) is 4 pixels lower (GRID_DY). Arcade's STAGE n / FINAL STAGE scripts and digits move up by the same 3 rows, and their erase (0x8013CB38) covers rows 2–11. The select timers (0x8013C428 / 0x8013C4B4) move one column outwards.
 
 ### Code space
 

@@ -731,8 +731,8 @@ def build(pac, mdl, first, template, exe, sheet=None, selpac=None, quote_files=N
     # palettes: 4 sets x (Zangief, Dan's 3 effect palettes)
     pals = bytearray()
     dan = first[DAN_PALS:DAN_PALS + 0x200]
-    for s in range(4):              # set 1 is the default (confirm with X)
-        mode = {0: 1, 1: 0, 2: 2, 3: 3}[s]
+    for s in range(4):              # set 0 = his own colours (Circle / Triangle, like
+        mode = s                    # everyone's standard), 1 blue (Cross / Square)
         c = recolour(cols, mode) if mode else cols
         pals += struct.pack('<16H', 0, *[bgr555(x) for x in c])
         pals += dan[s * 0x80 + 0x20:s * 0x80 + 0x80]

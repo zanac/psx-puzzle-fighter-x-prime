@@ -79,6 +79,10 @@ He sends and receives 90 %, and drops the "Siberian Bear" pattern (3×2 blocks).
 
 ![Zangief (P1) and Dan (P2) on their icons](docs/screenshots/select_icons.png)
 
+**Versus RESULT.** DAN and ZANGIEF are always listed, with separate counters. They are saved on the memory card with the others and come back at the next boot: here, a second Zangief vs Dan match after saving and restarting.
+
+![RESULT with Zangief's and Dan's own counters](docs/screenshots/result_zangief.png)
+
 **Secret characters without codes.**
 - **The ring.** On the bottom row, Down cycles the cell through Devilot → Akuma → Mei-Ling → Anita and back. Up walks the same ring backwards. (In Street Puzzle, which has no Zangief/Dan row, Dan stays in the ring after Akuma.)
 - **Labels.** Mei-Ling and Anita get their own name labels, which the original select screen never had.
@@ -115,7 +119,7 @@ Done:
 - **Damage formula.** It reproduces the arcade X' patch exactly. It was fuzz-tested in an emulator against a Python model of the arcade code.
 - **Diamond.** It always applies its penalty, so the diamond trick is gone.
 - **Character select.** Zangief and Dan have their own icons on a new row. Pressing Down on the bottom row cycles through Devilot, Akuma, Mei-Ling and Anita. The select screen now has name labels for Mei-Ling, Anita and Zangief.
-- **Versus RESULT.** DAN and ZANGIEF are always listed, each with his own counters (saved on the memory card with the others); AKUMA and DEVILOT appear once used, and the totals and menu moved down to make room.
+- **Versus RESULT.** DAN and ZANGIEF are always listed, each with his own counters, saved on the memory card with the others (vanilla dropped Dan's from the save unless he was unlocked); AKUMA and DEVILOT appear once used, and the totals and menu moved down to make room.
 - **Zangief.** He is complete in Versus and Arcade, ending included: see [Zangief](#zangief).
 - **Markers.** `X"` appears between the win counters during matches, and `X" BALANCE PATCH BY ZANAC` appears on the title screen.
 - **Codes.** The old secret-character codes are disabled; cycling replaces them.
@@ -198,7 +202,7 @@ For the others, move to the bottom row and keep pressing **Down**.
 - **Down** cycles the character on that cell through Devilot, Akuma, Mei-Ling and Anita, then back to the cell's own character.
 - **Up**, while a secret character is shown, goes back one step in the same ring (Anita → Mei-Ling → Akuma → Devilot → the cell's character). On the cell's own character, Up moves to the top row as usual.
 - **Left or Right** return to the normal grid.
-- **Colours.** As in vanilla, the button used to confirm picks them: Circle or Triangle give the standard colours, Cross or Square the alternate ones.
+- **Colours.** As in vanilla, the button used to confirm picks them: Circle or Triangle give the standard colours, Cross or Square the alternate ones. Zangief follows the same rule (red with Circle, blue with Cross); Zangief vs Dan is not a mirror match, so both keep the colours they chose.
 
 Mei-Ling and Anita keep Hsien-Ko's and Donovan's portrait on the select
 screen, with their own name label; they appear as themselves in the match.

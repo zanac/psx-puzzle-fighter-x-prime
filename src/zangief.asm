@@ -1078,7 +1078,7 @@ xp_zchibipal:
 	li      at, xp_mv_ret           ; called by the cursor move (xprime.asm):
 	bne     ra, at, @@set           ; not chosen yet, show his own colours
 	nop
-	li      a2, 1                   ; (set 1 = original, see tools/zangief.py)
+	li      a2, 0                   ; (set 0 = original, see tools/zangief.py)
 @@set:
 	sll     a2, a2, 7
 	addu    a0, v0, a2
@@ -1608,7 +1608,7 @@ xp_zhinit:
 	li      v0, 2
 	sb      v0, 0x45(s0)
 	sb      a3, 0xD(s0)
-	li      a0, ZH_REC + ZG_PALOFF + 0x80  ; his own colours (set 1)
+	li      a0, ZH_REC + ZG_PALOFF         ; his own colours (set 0)
 	li      a1, 3
 	jal     0x80108C68
 	li      a2, 12

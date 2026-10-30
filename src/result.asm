@@ -129,6 +129,13 @@ xp_zclear:
 
 .endarea
 
+; Saving (0x80103E50) zeroes the counters of a secret character that was
+; only reached by its code this session (Dan: 0x80103F04, flag 0x8016CAFA
+; clear and "used" 0x801BF120 set), so they never reach the card. Dan is
+; listed like everyone else now: his counters are always saved.
+.org 0x80103F10
+	b       0x80103F4C                  ; (delay slot: ori a1, s0, 0x200)
+
 .org 0x8014E03C
 .area 0x8014E0CC - 0x8014E03C, 0
 ; save block (0x801039C0, was jal 0x80103E50): then 'ZGST', his counters

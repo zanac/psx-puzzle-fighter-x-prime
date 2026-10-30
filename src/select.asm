@@ -135,14 +135,18 @@ xp_icon_dan:                            ; (0,96), top-right tiles from the strip
 xp_icondelay:                           ; 0x8016A840 + Zangief, Dan
 	.byte   76, 64, 60, 72, 80, 84, 88, 68, 92, 96
 .align 4
+; the whole grid sits GRID_DY pixels lower than in vanilla, for some room
+; between the logo (which cannot go higher: row 1 is off the visible top)
+; and the new row
+GRID_DY equ 4
 xp_iconpos:                             ; 0x8016A850 (x, y; y up) + Zangief, Dan
-	.halfword 88, -112, 136, -64, 88, -64, 232, -64
-	.halfword 136, -112, 184, -112, 232, -112, 184, -64
-	.halfword 136, -16, 184, -16
+	.halfword 88, -112-GRID_DY, 136, -64-GRID_DY, 88, -64-GRID_DY, 232, -64-GRID_DY
+	.halfword 136, -112-GRID_DY, 184, -112-GRID_DY, 232, -112-GRID_DY, 184, -64-GRID_DY
+	.halfword 136, -16-GRID_DY, 184, -16-GRID_DY
 xp_cursorxy:                            ; 0x8016A974 + positions 8 (Zangief), 9 (Dan)
-	.halfword 84, 136, 132, 136, 180, 136, 228, 136
-	.halfword 84, 88, 132, 88, 180, 88, 228, 88
-	.halfword 132, 184, 180, 184
+	.halfword 84, 136-GRID_DY, 132, 136-GRID_DY, 180, 136-GRID_DY, 228, 136-GRID_DY
+	.halfword 84, 88-GRID_DY, 132, 88-GRID_DY, 180, 88-GRID_DY, 228, 88-GRID_DY
+	.halfword 132, 184-GRID_DY, 180, 184-GRID_DY
 xp_cursorchars:                         ; CURSOR_CHARS + positions 8, 9
 	.byte   2, 1, 7, 3, 0, 4, 5, 6, ZG_CHAR, ZG_CHAR
 .align 4
@@ -292,6 +296,38 @@ xp_ringnext:
 	j       xp_mv_apply
 	nop
 
+; xp_samechar: confirming a character the other player already has gives
+; the second one the other colour set (0x8013B058). Dan and Zangief are
+; both character 10: unless both are Zangief or both Dan, they count as
+; different. Replaces "lb v1, 0x74(s1)" at 0x8013B05C (a0 = the other
+; player's character, s0 / s1 = other / this select struct). Out: v1 =
+; this character, or -1. Keeps v0 (the colour set). Uses at, t0-t2.
+xp_samechar:
+	lb      v1, 0x74(s1)
+	li      at, ZG_CHAR
+	bne     v1, at, @@ret
+	nop
+	bne     a0, at, @@ret
+	lui     t0, hi(XP_ZOKN)
+	lbu     t0, lo(XP_ZOKN)(t0)
+	nop
+	xori    t0, t0, 3
+	bnez    t0, @@ret
+	lui     t0, hi(XP_ZBITS)
+	lbu     t0, lo(XP_ZBITS)(t0)
+	lb      t1, 0x73(s0)
+	lb      t2, 0x73(s1)
+	srlv    t1, t0, t1
+	srlv    t2, t0, t2
+	xor     t1, t1, t2
+	andi    t1, t1, 1
+	beqz    t1, @@ret
+	nop
+	li      v1, -1
+@@ret:
+	jr      ra
+	nop
+
 ; xp_ringprev: Up on Mei-Ling (t2 = ZG_CHAR): Dan, or Akuma in Versus / Arcade
 xp_ringprev:
 	lui     v0, hi(XP_ZOKN)
@@ -365,3 +401,6 @@ xp_portstore:
 .org 0x801145F0
 	j       xp_portstore
 	nop
+
+.org 0x8013B05C
+	jal     xp_samechar             ; (delay slot: nop)
