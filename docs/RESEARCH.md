@@ -229,6 +229,15 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 - The setting starts at RANDOM, and `xp_title` resets it to RANDOM.
 - The code and its variables live at `0x801544E4`, a 996-byte function with no references (no `jal`, no pointer, no `lui`/`addiu` pair). Emulator coverage never reached it.
 
+## 7c. Character select after a challenge
+
+- `0x801BAAD0` is the "done" mask: bit p set means player p does not choose. The per-frame select caller (`0x8013A848`) skips the handler of a done player.
+- `0x801BAAD1` holds the joining players (game `+0x3B`).
+- Vanilla init (`0x8013A0B4`) computes done = playing (`+0x4B`) | ~joining (`+0x3B`). With a challenger in Arcade (`+0x4B` = 1, `+0x3B` = 2), the defender is done and keeps the character.
+- The per-player setups (`0x8013A400` P1, `0x8013A624` P2) create the cursor badge (object type `0x21`) only for a joining player. They use pose `0x18` for a playing player and `0x17` for a choosing one.
+- Versus CONTINUE already gives done = 0, so both players choose.
+- **Patch:** done = ~(playing | joining) & 3. The badge test (`0x8013A558`, `0x8013A77C`) and the pose test (`0x8013A5C8`, `0x8013A7EC`) read the done mask through `xp_notdone` / `xp_done`. Arcade 1P starts and Versus give the same values as vanilla.
+
 ## 8. Design decisions
 
 1. **Secret characters:** Down on the bottom row cycles the cell's character through Devilot → Akuma → Dan → Mei-Ling → Anita → cell character. The cursor stays on the visible cell. Confirmation reuses the vanilla secret-code path, so all the vanilla side effects happen.

@@ -22,6 +22,7 @@ Hey dude! Help me out for a couple of :beers: or a :coffee:!<br/>
 - **PSX X' addition — Dan:** new "Gadoken" drop pattern (red spine: columns 1/3/5 red, mixed pairs between) instead of all red; sends 110 % and receives 110 %
 - `X'` marker in game
 - **Versus stage selector:** RANDOM (default), NORMAL or a fixed stage, chosen by P1 on the select screen
+- **Challenges:** when a second player joins an Arcade game, both players choose their character again
 
 ## Screenshots
 
@@ -52,6 +53,10 @@ RANDOM changes the stage at every match:
 
 ![Four RANDOM matches in a row](docs/screenshots/stage_random.png)
 
+**Challenges in Arcade.** When P2 joins, the defender can change character too. Both cursors start on the last character picked.
+
+![Challenge: both players choose again](docs/screenshots/challenge_select.png)
+
 ## Status
 
 Done:
@@ -63,6 +68,7 @@ Done:
 - **Markers.** `X'` appears between the win counters during matches, and "X' BALANCE PATCH BY ZANAC" appears on the title screen.
 - **Codes.** The old secret-character codes are disabled; cycling replaces them.
 - **Versus stage selector.** It is described below.
+- **Challenges.** In vanilla, a challenger in Arcade chooses alone and the defender keeps the character. Now both choose again, starting from their last character. After a Versus match, CONTINUE already lets both players change, as in vanilla.
 - **Output formats.** The patch and build scripts always write BIN + CUE and PBP, whatever the input.
 
 See [docs/RESEARCH.md](docs/RESEARCH.md) for the map of the PSX executable.
@@ -148,6 +154,16 @@ On the Versus character select, before confirming the character, P1 presses
 `L1 < STAGE: name > R1` under the grid shows the setting (NORMAL, RANDOM or
 a stage name). RANDOM is already selected when you enter Versus.
 P2's L1/R1 do nothing.
+
+## Challenges and rematches
+
+- **Versus, after a match:** choose CONTINUE on the RESULT screen. Both
+  players are back on the character select, with the cursor on their last
+  character, and both can change it (vanilla behaviour).
+- **Arcade, when a second player joins:** the challenger and the player who
+  was already in the game both choose their character. The cursors start on
+  the last character picked. Whoever wins goes on with the Arcade, using the
+  character chosen for the challenge.
 
 ## Tools
 

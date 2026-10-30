@@ -535,6 +535,40 @@ xp_marker_clear:
 	j       xp_labelframe           ; label setter tail (delay slot stores v1)
 
 ; ============================================================================
+; CHALLENGE: BOTH PLAYERS CHOOSE AGAIN
+; Select-screen init (0x8013A0B4) sets the "done" mask 0x801BAAD0 =
+; playing (game +0x4B) | ~joining (game +0x3B). With a challenger in Arcade,
+; the player already in the game is "done" and keeps the character. X': only
+; players that take no part are done (~(playing | joining) & 3), so both
+; challenger and defender choose, starting from their last character.
+; Versus (both joining) and 1P starts give the same mask as vanilla.
+; ============================================================================
+.org 0x8013A0B4
+	lbu     v1, 0x4B(s0)            ; playing
+	lbu     v0, 0x3B(s0)            ; joining
+	nop
+	or      v1, v1, v0
+	nor     v1, v1, zero
+	andi    v1, v1, 3               ; done = ~(playing | joining) & 3
+	nop
+	nop
+	; 0x8013A0D4: lui at, 0x801C / sb v1, -0x5530(at) (vanilla)
+
+; The per-player setups create the cursor badge only for a joining player
+; (+0x3B) and use the "confirmed" pose for a playing one (+0x4B). Both now
+; follow the done mask instead (xp_notdone / xp_done in stage.asm), so the
+; defender gets a badge and the choosing pose. Same result as vanilla when
+; nobody is re-choosing.
+.org 0x8013A558
+	jal     xp_notdone              ; P1 badge  (was lbu v0, 0x3B(s0))
+.org 0x8013A5C8
+	jal     xp_done                 ; P1 pose   (was lbu v0, 0x4B(s0))
+.org 0x8013A77C
+	jal     xp_notdone              ; P2 badge
+.org 0x8013A7EC
+	jal     xp_done                 ; P2 pose
+
+; ============================================================================
 ; X' MARKERS
 ; ============================================================================
 .org 0x80123FE4
