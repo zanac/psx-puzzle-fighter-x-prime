@@ -606,5 +606,6 @@ xp_marker_clear:
 .include "src/stage.asm"
 .include "src/files.asm"
 .include "src/zangief.asm"
+.include "src/result.asm"
 
 .close
