@@ -27,6 +27,7 @@ The Spinning Piledriver frames get a vertical lift (jumps are object motion in
 Pocket Fighter, not part of the frames).
 
 usage: zangief.py ZANGIEF.PAC PL09A.MDL FIRST.EMI PL9A_OBJ.EMI SLUS_004.18 OUT.EMI [--sheet PNG]
+       [--select PF_SELECT.PAC] [--quotefont PL00_OBJ.EMI,...] [--selmes SELMES.MDL]
        zangief.py voices SE0AA.PAC SE_PL0A.EMI OUT.EMI [--wav DIR]   (SE_PL0B.EMI)
        zangief.py name SELECT.EMI SE0D.PAC OUT.EMI    (his name call on the select screen)
 """
@@ -410,39 +411,107 @@ def build_portraits(selpac, gfx_base):
 # index up to 246 must hold a valid record (an empty one where Zangief has
 # nothing). The quotes are set with the glyphs of Dan's own quotes (only the
 # letters those contain).
+# WINNER screen quotes (frames 239-242): Zangief's own four win quotes from
+# Pocket Fighter (MDL/SELMES.MDL, decoded with tools/pf_texts.py from the
+# user's disc). Without it, these stand-ins:
 WIN_QUOTES = (("Ahahaha! I crush you like a", "tin can! You are too tiny!"),
               ("Dance with me again when you", "grow some muscles!"),
               ("Gems or no gems! Strength", "wins in the end!"),
               ("Ahahaha! Strong muscles win", "again! I am the strongest!"))
-DAN_QUOTES = (("I'll make you cry like I did when", "my daddy died!"),
-              ("Amateur! Go home and practice", "dragon punches!"),
-              ("I thought I taught you well.", "You know nothing! Dummy!"),
-              ("Yeahhh! I'm the strongest there", "is! But don't tell Sagat..."))
+ZG_PF_INDEX = 9                 # Zangief in Pocket Fighter's character order
+
+# The quote font: every character's own win quotes on SPF2T's WINNER screen
+# (2 lines of 8x16 text per frame; a 1-line quote is drawn at y 8). The
+# letters are taken from these frames (first frame of each file, then the
+# quotes in order; checked against the glyph cells).
+QUOTE_SOURCES = {
+    'PL00': (220, (("Baby, baby, baby...", "I didn't even sweat!"),
+                   ("Oh Damn...I think I split a hair.", ""),
+                   ("It's not whether I win or lose,", "just as long as I piss you off!"),
+                   ("The sun's rising. I will rest'til", "the morrow, then win again."))),
+    'PL01': (155, (("Why waste my time?", "You'll just keep losing!"),
+                   ("I'm the strongest puzzle fighter", "in the world!"),
+                   ("Sorry! But I don't know how to", "pull punches."),
+                   ("I'm too smart to fall for your", "stupid patterns."))),
+    'PL02': (228, (("You need more training to stand a", "chance."),
+                   ("You've fought well. I was honored.", ""),
+                   ("Don't tell me, you only know how", "to play fighting games?"),
+                   ("All too easy...You just don't know", "the bliss of the bombs."))),
+    'PL03': (228, (("I have proven the difference", "between us: you just suck."),
+                   ("You must learn when to defend and", "when to attack!"),
+                   ("Not only am I disappointed,", "inside I am laughing at you."),
+                   ("It was a beautiful victory,", "if I do say so myself!"))),
+    'PL04': (373, (("And again, I won with ease.", ""),
+                   ("Hey, it's not time for you to walk", "away! Try again."),
+                   ("Why do you hold back? Your", "overconfidence is your weakness!"),
+                   ("My revenge begins with you.", ""))),
+    'PL05': (321, (("No one can interfere with my", "plans!"),
+                   ("I won't rest until this girl is", "finally happy!"),
+                   ("I'll put an end to the evil curse", "in my blood at any cost!"),
+                   ("I am the one who lives in darkness", "and shatters it!"))),
+    'PL06': (154, (("You're about as sharp as a circle!", ""),
+                   ("Meow...", "How'd you like them apples?"),
+                   ("I won by a tail's length.", "Now go back to my litterbox!"),
+                   ("You're stoned! Get it? Ha ha ha...", ""))),
+    'PL07': (212, (("Whew, you were good!", "I've got to train harder!"),
+                   ("Yes...All part of the plan!", ""),
+                   ("You're quick, smart, and cheap!", "No wait...that's me! Ha ha ha."),
+                   ("Only my second game, and I am", "already the best!"))),
+    'PL08': (262, (("Let the gems hold you as I plan", "for your death!"),
+                   ("You've been very bad.", "Your punishment:the death penalty!"),
+                   ("What you don't recognize me!?", "Cyberbots is Capcom's #1 game!"),
+                   ("I know you want me...but can you", "handle it?"))),
+    'PL9A': (235, (("I am Akuma! Also a master puzzler!", ""),
+                   ("You're just a pathetic example of", "carbon-based wastage."),
+                   ("To beat you is not enough.", "I must destroy you!!"),
+                   ("Evil is what I am.", "Death is what I bring."),
+                   ("I'll make you cry like I did when", "my daddy died!"),
+                   ("Amateur! Go home and practice", "dragon punches!"),
+                   ("I thought I taught you well.", "You know nothing! Dummy!"),
+                   ("Yeahhh! I'm the strongest there", "is! But don't tell Sagat..."))),
+}
+# a glyph no SPF2T quote has: the closing double quote (drawn here, after
+# the apostrophe)
+EXTRA_GLYPHS = {'”': ["........", "13f.13f.", "31f.31f.", "73f.73f.", "39..39..",
+                       "f...f..."] + ["........"] * 10}
+
 N_FRAMES = 247              # Dan's file: frames 0-246
 ICON_SRC = (96, 20, 196, 120)   # PF select art (mirrored): his face
 # (frame 246 is drawn with the character's body palette, as for Dan: see
 # xp_zwinpal)
 
-def dan_frame_pixels(template, n):
+def quote_font(files):
+    """files: {'PL00': EMI bytes, ...} (at least PL9A). The glyphs are not
+    boxed: take each letter where its neighbours are spaces if possible, so
+    no stray pixels come along."""
     import spf_sprites as SP
-    e = SP.entries(template)
-    return SP.frame(e[0], SP.records(e[1])[n])
-
-def quote_font(template):
-    # the glyphs are not boxed: take each letter where its neighbours are
-    # spaces if possible, so no stray pixels come along
     font, score = {}, {}
-    for k, lines in enumerate(DAN_QUOTES):
-        _, px = dan_frame_pixels(template, 239 + k)
-        for j, text in enumerate(lines):
-            for i, ch in enumerate(text):
-                if ch == ' ':
-                    continue
-                sc = (i > 0 and text[i - 1] != ' ') + (i + 1 < len(text) and text[i + 1] != ' ')
-                if ch not in font or sc < score[ch]:
-                    font[ch] = [row[8 * i:8 * i + 8] for row in px[16 * j:16 * j + 16]]
-                    score[ch] = sc
+    for name, (first, quotes) in QUOTE_SOURCES.items():
+        if name not in files:
+            continue
+        e = SP.entries(files[name])
+        recs = SP.records(e[1])
+        for k, lines in enumerate(quotes):
+            _, px = SP.frame(e[0], recs[first + k])
+            rows = [(0, lines[0]), (16, lines[1])] if lines[1] else [(8, lines[0])]
+            for y0, text in rows:
+                for i, ch in enumerate(text):
+                    if ch == ' ':
+                        continue
+                    sc = (i > 0 and text[i - 1] != ' ') + (i + 1 < len(text) and text[i + 1] != ' ')
+                    if ch not in font or sc < score[ch]:
+                        font[ch] = [row[8 * i:8 * i + 8] for row in px[y0:y0 + 16]]
+                        score[ch] = sc
+    for ch, rows in EXTRA_GLYPHS.items():
+        if ch not in font:
+            font[ch] = [[int(c, 16) if c != '.' else 0 for c in r] for r in rows]
     return font
+
+def pf_win_quotes(selmes):
+    """Zangief's four win quotes from Pocket Fighter's SELMES.MDL"""
+    import pf_texts
+    q = pf_texts.win_quotes(selmes)[ZG_PF_INDEX * 4:ZG_PF_INDEX * 4 + 4]
+    return tuple(tuple(x.split(' / ')) for x in q)
 
 def cells_record(px, x, y, gfx_off):
     """Index image (multiple of 16 in both sizes) -> (record without offset
@@ -473,18 +542,20 @@ def cells_record(px, x, y, gfx_off):
     rec = struct.pack('<IhhBBBB', gfx_off, x, y, h, w, units, 0x40) + struct.pack('<8I', *words)
     return rec, lz
 
-def winner_frames(template, cols, selpac, gfx_off):
+def winner_frames(template, cols, selpac, gfx_off, quote_files=None, quotes=None):
     """-> {frame index: record}, LZ bytes (frames 239-242 quotes, 246 icon,
     and the shared empty record, returned under key None)"""
     from PIL import Image
-    font = quote_font(template)
+    files = dict(quote_files or {})
+    files.setdefault('PL9A', template)
+    font = quote_font(files)
     out, gfx = {}, bytearray()
     def add(px, x, y):
         rec, lz = cells_record(px, x, y, gfx_off + len(gfx))
         gfx.extend(lz + bytes(-len(lz) % 4))
         return rec
     out[None] = add([[0] * 16 for _ in range(16)], 0, 0)
-    for k, lines in enumerate(WIN_QUOTES):
+    for k, lines in enumerate(quotes or WIN_QUOTES):
         w = max(len(t) for t in lines) * 8
         w = (w + 15) // 16 * 16
         px = [[0] * w for _ in range(32)]
@@ -492,7 +563,7 @@ def winner_frames(template, cols, selpac, gfx_off):
             for i, ch in enumerate(text):
                 if ch == ' ':
                     continue
-                g = font[ch]                    # KeyError: no such glyph in Dan's quotes
+                g = font[ch]                    # KeyError: no SPF2T quote has it
                 for yy in range(16):
                     px[16 * j + yy][8 * i:8 * i + 8] = g[yy]
         out[239 + k] = add(px, 0, 0)
@@ -504,7 +575,8 @@ def winner_frames(template, cols, selpac, gfx_off):
         out[246] = add(px, -16, -16)
     return out, bytes(gfx)
 
-def build(pac, mdl, first, template, exe, sheet=None, selpac=None):
+def build(pac, mdl, first, template, exe, sheet=None, selpac=None, quote_files=None,
+          quotes=None):
     pf = PFFrames(pac)
     anims = build_anims(mdl)
     used = {name: anims[name] for name in set(STATES.values())}
@@ -595,7 +667,7 @@ def build(pac, mdl, first, template, exe, sheet=None, selpac=None):
     lst += struct.pack('<II', base, hit_hi)
     lst += struct.pack('<II', hit_hi, calm_hi)          # idle 0 + pinch 1 scripts
     # WINNER screen frames, and a valid (empty) record at every index up to 246
-    wf, wgfx = winner_frames(template, cols, selpac, len(gfx))
+    wf, wgfx = winner_frames(template, cols, selpac, len(gfx), quote_files, quotes)
     gfx += wgfx
     assert len(recs) <= 239, len(recs)
     for n in range(len(recs), N_FRAMES):
@@ -765,6 +837,12 @@ if __name__ == '__main__':
     sheet = a[a.index('--sheet') + 1] if '--sheet' in a else None
     rd = lambda p: open(p, 'rb').read()
     selpac = rd(a[a.index('--select') + 1]) if '--select' in a else None
-    out, n, g, e1 = build(rd(a[0]), rd(a[1]), rd(a[2]), rd(a[3]), rd(a[4]), sheet, selpac)
+    qfiles = {}                     # --quotefont PLxx_OBJ.EMI,... (SPF2T)
+    if '--quotefont' in a:
+        for f in a[a.index('--quotefont') + 1].split(','):
+            qfiles[os.path.basename(f)[:4].upper()] = rd(f)
+    quotes = pf_win_quotes(rd(a[a.index('--selmes') + 1])) if '--selmes' in a else None
+    out, n, g, e1 = build(rd(a[0]), rd(a[1]), rd(a[2]), rd(a[3]), rd(a[4]), sheet, selpac,
+                          qfiles, quotes)
     open(a[5], 'wb').write(out)
     print('%d frames, graphics 0x%X bytes, bank 0x%X bytes' % (n, g, e1))

@@ -316,7 +316,10 @@ Everything below is only active in Versus with Zangief's bit set, and only in bu
 - **Dan's effect frames.** Dan's file also has effect frames 243–245.
 - **The bug this caused.** Zangief's file had about 70 frames. The higher indices were zero records pointing at graphics offset 0, which became the portrait block after this step. The game then decoded the block as LZ, and the match ending crashed (and the K.O. effect was missing).
 - **The fix.** Every index up to 246 is now valid: an empty record where he has nothing, his own quotes and icon where the screen needs them.
-- **Quotes.** Set with the glyphs of Dan's own quotes (`WIN_QUOTES` in `tools/zangief.py`; only letters those contain, so no f, b, v, x, z, q, j or commas).
+- **Quotes.** Zangief's own four Pocket Fighter win quotes. At build time they are decoded from the user's `MDL/SELMES.MDL` (`pf_win_quotes`, using `tools/pf_texts.py`).
+  - **Font.** The letters are taken from every character's SPF2T quote frames (`QUOTE_SOURCES`: PL00–PL08 and PL9A). The transcriptions are checked against the glyph cells: a 1-line quote is drawn at y 8.
+  - **Hand-drawn glyph.** The closing double quote is missing from SPF2T and is drawn by hand (`EXTRA_GLYPHS`).
+  - **Without `XP_PF`.** The old stand-in quotes stay.
 - **Icon palette.** The icon is drawn with Dan's body palette (Dan's own path at `0x80110088`). `xp_zwinpal` loads palette 0 of Zangief's colour set instead.
 - **RESULT table.** As agreed, his wins count as Dan's on the RESULT table.
 
