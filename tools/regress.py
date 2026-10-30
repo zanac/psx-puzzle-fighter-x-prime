@@ -2,7 +2,8 @@ import sys,random,struct,json; sys.path.insert(0, __import__('os').path.dirname(
 from nav import *
 from model import xprime
 """End-to-end regression: title, select (secret cycle), damage fuzz against
-model.py, match end + RESULT, Arcade with Devilot, Street Puzzle, demo.
+model.py, match end + RESULT, Arcade with Devilot (P1 wins every match: it
+must reach 4 different opponents, arcade_ok), Street Puzzle, demo.
 
 usage: regress.py IMAGE.(pbp|cue) OUTDIR
 Writes screenshots, savestates and result.json into OUTDIR."""
@@ -59,11 +60,19 @@ e.press(lr.CROSS,6,200); e.press(lr.CROSS,6,200)
 e.press(lr.DOWN,4,30); e.press(lr.DOWN,4,30); e.press(lr.CROSS,6,30)
 for i in range(6): e.run(120); e.press(lr.CROSS,4,4)
 sh('arcade'); R['arcade_char']=e.r8(0x801ae568)
-for k in range(30):
+# Arcade progress: P1 wins every match (garbage forced on P2); the run must
+# get through several opponents (catches hangs between Arcade matches)
+opp=[]
+for k in range(200):
     for f in range(60): e.w16(0x801ae500+0x22a,250); e.run(1)
     e.press(lr.CROSS,4,4)
     if k==20: sh('arcade_next')
+    c=e.r8(0x801ae814)
+    if e.r8(0x8019c40f)==1 and (not opp or opp[-1]!=c): opp.append(c)
+    if len(opp)>=4: break
 sh('arcade_late')
+R['arcade_opponents']=opp
+R['arcade_ok']=len(opp)>=4
 # street puzzle
 e.load_state(P_('st_menu.state'))
 e.press(lr.DOWN,8,30); e.press(lr.CROSS,6,250); e.press(lr.CROSS,6,400); e.run(300); sh('street')

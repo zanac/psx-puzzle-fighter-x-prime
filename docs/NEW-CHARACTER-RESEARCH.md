@@ -328,9 +328,9 @@ Everything below is only active in Versus with Zangief's bit set, and only in bu
 New never-run, unreferenced functions:
 - `0x80152C14` (332 bytes);
 - `0x8015515C`–`0x801554C4` (three functions, 872 bytes);
-- `0x8013BBB4` (308 bytes).
+- `0x80153AF4` (236 bytes; first `0x8013BBB4` was used, see the correction below).
 
-All are checked with coverage over boot, menus, Versus select, VS and a match.
+All are checked with coverage over boot, menus, Versus select, VS and a match. Since the correction below, they are also checked over a whole Arcade run with its ending, Street Puzzle and the option menus.
 
 ## Step 6: stage and music (done)
 
@@ -476,3 +476,13 @@ Seen in the emulator with a forced win in every match. The RAM pokes are below; 
   - P2 vitality: `0x801E20E0` (player block stride `0x2E8`).
 
   Setting P2's vitality to 1 and the timer to 1 wins every round by time over.
+
+## Correction: Arcade hang (step 5 code space)
+
+- **The bug.** From step 5 on, Arcade hung after the first match won, while loading the next opponent. Builds without `XP_PF` were not affected.
+- **The cause.** The step-5 code area `0x8013BBB4` (308 bytes) was taken for an unreferenced, never-run function. Only its first 36 bytes are that. From `0x8013BBD8` on, it is a function that `0x8013BCC8` calls, and the Arcade runs it between matches. The coverage then covered Versus only, so it missed it.
+- **The fix.**
+  - The select-chibi code (`xp_zselst`, `xp_zselbank`, `xp_zchibipal`) moves to `0x80153AF4` (236 bytes, no references).
+  - Coverage was redone on the original disc over a whole Arcade run (10 opponents, ending, staff roll), Street Puzzle and the option menus. None of the code areas this project uses runs there.
+- **New regression check.** `tools/regress.py` now plays Arcade with P1 winning every match. It must reach 4 different opponents (`arcade_ok`).
+- **Original Arcade order with Ryu,** as seen in that run: Morrigan, Sakura, Hsien-Ko, Ken, Felicia, Chun-Li, Donovan, Ryu, Dan, Akuma (the opponents vary with the random seed).

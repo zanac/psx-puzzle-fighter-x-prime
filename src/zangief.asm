@@ -1007,10 +1007,13 @@ XP_ZK:
 ; The chibis are drawn from SELECT.EMI's banks (0x80136400 picks them, then
 ; 0x80123960 sets the object up). For Zangief, states 23/24 (choosing /
 ; chosen) come from his file, loaded in the other banks (xp_zselload), and
-; the colour from his palette block. Code space: 0x8013BBB4 (308 bytes, a
-; function with no references that never runs, same coverage).
-.org 0x8013BBB4
-.area 0x134, 0
+; the colour from his palette block. Code space: 0x80153AF4 (236 bytes, a
+; function with no references that never runs: coverage over boot, menus,
+; Versus, a whole Arcade run with its ending, Street Puzzle and the option
+; menus). (0x8013BBB4, used here before, is NOT free: its second half is a
+; function the Arcade calls between matches; overwriting it hung Arcade.)
+.org 0x80153AF4
+.area 0x80153BE0 - 0x80153AF4, 0
 
 ; from xp_zstate (state 23/24, Zangief side t8, a1 = state * 4, s1 = the
 ; object): only for the select-state start (0x80136430, return 0x80136438).
