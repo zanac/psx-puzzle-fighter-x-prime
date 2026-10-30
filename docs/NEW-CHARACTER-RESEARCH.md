@@ -109,6 +109,11 @@ Still to do:
 
 ## Stage
 
+- Pocket Fighter loads files by index through a table of 12-byte entries `(LBA, size, type)`. In RAM it sits at `0x801D0268 − 12 × 0xEE` (the EXE loads at `0x80188A00`).
+- `STAGE/ST00.PAC` is file id `0xEE`; `ST01`–`ST08` follow.
+- Free Battle always loads `ST00` (the "MAX MUM" bar), whatever the characters.
+- There are only 9 stages for 12 characters, so some characters share one. Zangief's home stage is the one Arcade uses against him; finding it is part of step 6.
+
 Not mapped yet:
 - SPF2T stages are 36 sectors each (`STAGEnn.EMI`).
 - Pocket Fighter stages are `STAGE/STnn.PAC`, multi-layer.
