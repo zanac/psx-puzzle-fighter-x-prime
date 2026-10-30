@@ -423,3 +423,53 @@ An EMI with 5 entries. For each entry the header holds the size, the parameters 
 
 - **New space:** the rest of `0x80163CDC` (tables and the load function).
 - **Moved:** `xp_done` and `xp_notdone`, to the X' area at `0x80134D80`, to make room for `xp_stage`.
+
+## Pocket Fighter texts (win quotes, rival dialogue, Arcade story)
+
+All of them are decoded from the user's disc by `tools/pf_texts.py` (Markdown output). The repository stores no text and no glyph data: only, for each glyph strip, the letter of each index.
+
+### Encoding
+
+- **Not ASCII.** Each byte is an index into a strip of 16×16 4bpp glyphs (128 bytes each).
+  - 0 is a space; 1 and 2 are the "more text" prompt icons.
+  - Each strip has its own order: the order in which its letters first appear in its texts.
+- **How it was found.** A line on screen was searched for in RAM by its letter-repetition pattern, then looked up in the files.
+
+### Where the texts are
+
+| Texts | File | Glyph strip |
+|---|---|---|
+| Win quotes | `MDL/SELMES.MDL` from offset 4: lines of `0x80 \| length` + glyphs, two lines per quote, padding bytes (< 0x80) between lines | `STAGE/SELECT.PAC`, first entry (60 glyphs, shared) |
+| Rival dialogue (the Arcade "special" opponent) | `MDL/PLxxA.MDL`, the last 4 messages | `PLAYER/BMESxx.PAC` |
+| Arcade story: opening, then ending | `MDL/ENDING.MDL`, every character in order (the tool has each one's start offset) | `STAGE/OPENxx.PAC` type 269 (= `ENDxx.PAC` type 270) |
+
+- **Win quotes.** There are 4 per character, in character order (48 quotes), followed by the gameplay tips shown on the CONTINUE screen.
+- **Message format.** Rival dialogue and story messages are (length, glyphs). The length is a multiple of 38: one line is 38 characters, padded with spaces.
+- **Character order:** Ryu, Ken, Chun-Li, Sakura, Morrigan, Hsien-Ko, Felicia, Tessa, Ibuki, Zangief, Dan, Akuma (`xx` = 00–0B).
+- **Loss quotes.** Pocket Fighter has none. The loser gets the CONTINUE screen, with a gameplay tip.
+
+### Zangief's Arcade mode (for a later Arcade Zangief in SPF2T)
+
+Seen in the emulator with a forced win in every match. The RAM pokes are below; they are test aids, not part of the build.
+
+- **Opening.** 4 messages, in an airplane: his superior sends him to invite Felicia.
+- **Rival.** Felicia, with 4 lines of dialogue before the fight (`PL09A.MDL`), on her stage.
+- **Ending.** 9 messages, in three scenes plus a black screen:
+  1. Felicia gives in, on her stage.
+  2. Felicia on stage in Russia.
+  3. A black screen with text.
+  4. Zangief with his superior, on a blue background.
+- **Graphics.** The scenes are in `STAGE/END09.PAC`:
+  - type 36: tiles;
+  - type 37: tile map (8 blocks of 16×16);
+  - types 15/16/17/267: a large sprite set (the characters' close-ups);
+  - types 38/39: extra sprites;
+  - type 270: the text glyphs.
+
+  `OPEN09.PAC` has the same layout for the opening. Composing the scenes (layers, palettes) still needs the display-list tracing used for the castle.
+- **Test aids** (Pocket Fighter RAM, in a match):
+  - round timer: `0x801E0099` (decimal) / `0x801E0098` (BCD);
+  - P1 vitality: `0x801E1DF8` (max at `+2`, 144);
+  - P2 vitality: `0x801E20E0` (player block stride `0x2E8`).
+
+  Setting P2's vitality to 1 and the timer to 1 wins every round by time over.

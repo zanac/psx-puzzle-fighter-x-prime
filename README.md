@@ -198,6 +198,7 @@ P2's L1/R1 do nothing.
 | `tools/lzh.py` | codec for the sprite-graphics LZ (decoder `0x8010D5C0`) |
 | `tools/labels.py` | builds the MEI-LING / ANITA select-screen labels in FIRST.EMI |
 | `tools/pf_stage.py` | Zangief's stage and music from Pocket Fighter (castle picture, XA channel) |
+| `tools/pf_texts.py` | Pocket Fighter's win quotes, rival dialogue and Arcade story, decoded from your disc (Markdown) |
 | `src/stage.asm` | Versus stage selector (included by `src/xprime.asm`) |
 | `tools/regress.py` | end-to-end regression in the emulator (screens, damage, secrets) |
 | `tools/model.py` | Python model of the arcade X' damage formula (for tests) |
