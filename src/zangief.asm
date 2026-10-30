@@ -425,6 +425,41 @@ xp_zse:
 @@done:
 	j       0x80105984
 	nop
+; palette reload between rounds (0x80107430): both players' palettes are
+; uploaded from the player structs. Wraps the two "jal 0x80108C68": a2 =
+; 0xC for P1, 0x10 for P2, a0 = the vanilla source. Uses v0, v1, at.
+xp_zpal2:
+	li      v1, 0x801AE568          ; P1 struct + 0x68 (character)
+	li      at, 1
+	xori    v0, a2, 0xC
+	beqz    v0, @@side
+	nop
+	li      v1, 0x801AE814          ; P2
+	li      at, 2
+@@side:
+	lui     v0, hi(XP_ZBITS)
+	lbu     v0, lo(XP_ZBITS)(v0)
+	nop
+	and     v0, v0, at
+	beqz    v0, @@go
+	nop
+	lb      v0, 0(v1)
+	nop
+	xori    v0, v0, ZG_CHAR
+	bnez    v0, @@go
+	nop
+	lb      v0, 5(v1)               ; colour set (struct + 0x6D)
+	li      a0, BANK_P1 + ZG_PALOFF
+	xori    at, at, 1
+	beqz    at, @@set
+	nop
+	li      a0, BANK_P2 + ZG_PALOFF
+@@set:
+	sll     v0, v0, 7
+	addu    a0, a0, v0
+@@go:
+	j       0x80108C68
+	nop
 .endarea
 
 ; hooks only when the build has Zangief's file (XP_PF in build.sh);
@@ -454,4 +489,8 @@ xp_zse:
 .org 0x8010594C
 	j       xp_zse
 	nop
+.org 0x8010746C
+	jal     xp_zpal2
+.org 0x8010749C
+	jal     xp_zpal2
 .endif

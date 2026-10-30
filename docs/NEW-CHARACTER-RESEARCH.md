@@ -240,3 +240,8 @@ Sound codes `0xAxx` in his animations name voices: 0x16 is the Double Lariat sho
 - Damage fuzz 120/120; full regression passes; the plain build still reproduces `xprime-patch.json`.
 
 **Open.** Some slot roles are guesses (the samples cannot be listened to here); `VOICE_MAP` is one table to adjust by ear.
+
+## Fixes after the first videos
+
+- **Round 2 sprite.** Between rounds, `0x80107430` re-uploads both players' palettes straight from the player structs (character + 0x6D colour set). Zangief got Dan's palette there. `xp_zpal2` wraps its two `jal 0x80108C68` calls.
+- **Missing voices (super, K.O., win, raised hands).** These are script cues, not code. Script byte 11 is a voice index: `0x80136554` plays entry byte11 − 1 of the character's voice table at `0x8016EFFC`. `tools/zangief.py` now reads Dan's scripts from the EXE and puts each cue (and flag bit 0) on the Zangief entry playing at the same moment. A looping body is unrolled up to the last cue, so a cue never repeats unless Dan's does. Win sequence now: 30 (super), 27 (K.O.), 28 (win), 29, and the win pose's own voice.

@@ -6,6 +6,7 @@ Inputs come from the user's own discs at build time (no game data in the repo):
   PL09A.MDL    Pocket Fighter /MDL/PL09A.MDL (Zangief's animation array)
   FIRST.EMI    SPF2T /DATA/FIRST.EMI (Dan's effect palettes are reused)
   PL9A_OBJ.EMI SPF2T /DATA/PL9A_OBJ.EMI (EMI header template)
+  SLUS_004.18  SPF2T executable (Dan's scripts: voice cues and flags per state)
 
 Output: an SPF2T character file with the usual two entries.
   entry 0: halfword-LZ graphics, one stream per frame (tools/lzh.py)
@@ -23,7 +24,7 @@ scaled to 0.65 around the feet anchor and quantised to one 15-colour palette.
 The Spinning Piledriver frames get a vertical lift (jumps are object motion in
 Pocket Fighter, not part of the frames).
 
-usage: zangief.py ZANGIEF.PAC PL09A.MDL FIRST.EMI PL9A_OBJ.EMI OUT.EMI [--sheet PNG]
+usage: zangief.py ZANGIEF.PAC PL09A.MDL FIRST.EMI PL9A_OBJ.EMI SLUS_004.18 OUT.EMI [--sheet PNG]
        zangief.py voices SE0AA.PAC SE_PL0A.EMI OUT.EMI [--wav DIR]   (SE_PL0B.EMI)
 """
 import os, struct, sys
@@ -252,7 +253,54 @@ def make_record(img, ox, oy, cols, cache):
     rec += struct.pack('<8I', *words)
     return rec, lz
 
-def build(pac, mdl, first, template, sheet=None):
+DAN_STATES = 0x8018779C     # Dan's state list in SLUS_004.18
+
+def dan_events(exe):
+    """Per state: [(time, flag1, voice)] from Dan's scripts (first pass).
+    Script byte 11 is a voice index (0x80136554 plays the character's voice
+    table 0x8016EFFC entry byte11 - 1); flag bit 0 is kept as Dan has it."""
+    o = lambda a: a - 0x80100000 + 0x800
+    out = {}
+    for st in range(N_STATES):
+        p = struct.unpack_from('<I', exe, o(DAN_STATES + 4 * st))[0]
+        t, ev = 0, []
+        for _ in range(64):
+            dur, fl = struct.unpack_from('<HH', exe, o(p))
+            v = exe[o(p) + 11]
+            if fl & 1 or v:
+                ev.append((t, fl & 1, v))
+            if fl & 0x8000:
+                break
+            t += dur
+            p += 16
+        out[st] = ev
+    return out
+
+def place(ents, loop, events):
+    """Put Dan's events on the Zangief entry playing at the same time. A
+    looping body is unrolled until the last event, then one clean copy loops,
+    so a cue never repeats unless Dan's does. -> (ents, loop, sig)"""
+    ents = list(ents)
+    last_t = max((w for w, _, _ in events), default=-1)
+    if loop is not None and events:
+        body = ents[loop:]
+        while sum(e[0] for e in ents) <= last_t:
+            ents += body
+        loop = len(ents)
+        ents += body
+    starts, t = [], 0
+    for e in ents:
+        starts.append(t)
+        t += e[0]
+    sig = []
+    for when, f1, v in events:
+        j = max(i for i, st in enumerate(starts) if st <= when)
+        if loop is not None and j >= loop:
+            j = loop - 1
+        sig.append((j, f1, v))
+    return ents, loop, tuple(sig)
+
+def build(pac, mdl, first, template, exe, sheet=None):
     pf = PFFrames(pac)
     anims = build_anims(mdl)
     used = {name: anims[name] for name in set(STATES.values())}
@@ -278,18 +326,30 @@ def build(pac, mdl, first, template, sheet=None):
         c = recolour(cols, mode) if mode else cols
         pals += struct.pack('<16H', 0, *[bgr555(x) for x in c])
         pals += dan[s * 0x80 + 0x20:s * 0x80 + 0x80]
-    # scripts
-    scripts, where = bytearray(), {}
+    # scripts: one per (animation, Dan's events of the state)
+    devents = dan_events(exe)
+    scripts, where, per_state = bytearray(), {}, {}
     base = LISTOFF + 4 * N_STATES
-    for name, (ents, loop) in sorted(used.items()):
-        where[name] = base + len(scripts)
-        for k, (dur, key, f1, ev) in enumerate(ents):
-            last = k == len(ents) - 1
-            flags = f1 | (0x8000 if last else 0)
-            jump = ((loop if loop is not None else k) - k) if last else 0
-            scripts += struct.pack('<HHhh', dur, flags, index[key], jump)
-            scripts += bytes([0, 0, 0, 0, ev, 0, 3, 0])
-    lst = b''.join(struct.pack('<I', where[STATES[s]]) for s in range(N_STATES))
+    for st in range(N_STATES):
+        name = STATES[st]
+        ents, loop = used[name]
+        ents, loop, sig = place(ents, loop, devents[st])
+        key2 = (name, sig)
+        if key2 not in where:
+            where[key2] = base + len(scripts)
+            for k, (dur, key, _f1, _ev) in enumerate(ents):
+                f1 = v = 0
+                for j, ef, ev in sig:
+                    if j == k:
+                        f1 |= ef
+                        v = v or ev
+                last = k == len(ents) - 1
+                flags = f1 | (0x8000 if last else 0)
+                jump = ((loop if loop is not None else k) - k) if last else 0
+                scripts += struct.pack('<HHhh', dur, flags, index[key], jump)
+                scripts += bytes([0, 0, 0, v, 0, 0, 4 if name == 'still' else 3, 0])
+        per_state[st] = where[key2]
+    lst = b''.join(struct.pack('<I', per_state[s]) for s in range(N_STATES))
     e1 = bytearray(b''.join(recs))
     e1 += bytes(PALOFF - len(e1)) + pals
     e1 += bytes(LISTOFF - len(e1)) + lst + scripts
@@ -399,10 +459,10 @@ if __name__ == '__main__':
     a = sys.argv[1:]
     if a and a[0] == 'voices':
         voices_main(a[1:]); sys.exit(0)
-    if len(a) < 5:
+    if len(a) < 6:
         print(__doc__); sys.exit(1)
     sheet = a[a.index('--sheet') + 1] if '--sheet' in a else None
     rd = lambda p: open(p, 'rb').read()
-    out, n, g, e1 = build(rd(a[0]), rd(a[1]), rd(a[2]), rd(a[3]), sheet)
-    open(a[4], 'wb').write(out)
+    out, n, g, e1 = build(rd(a[0]), rd(a[1]), rd(a[2]), rd(a[3]), rd(a[4]), sheet)
+    open(a[5], 'wb').write(out)
     print('%d frames, graphics 0x%X bytes, bank 0x%X bytes' % (n, g, e1))
