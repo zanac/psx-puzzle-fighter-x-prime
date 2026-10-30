@@ -324,7 +324,7 @@ Everything below is only active in Versus with Zangief's bit set, and only in bu
   - **Hand-drawn glyph.** The closing double quote is missing from SPF2T and is drawn by hand (`EXTRA_GLYPHS`).
   - **Without `XP_PF`.** The old stand-in quotes stay.
 - **Icon palette.** The icon is drawn with Dan's body palette (Dan's own path at `0x80110088`). `xp_zwinpal` loads palette 0 of Zangief's colour set instead.
-- **RESULT table.** As agreed, his wins count as Dan's on the RESULT table.
+- **RESULT table.** As agreed at the time, his wins counted as Dan's on the RESULT table (superseded: see "Select screen icons and RESULT").
 
 ### Code space
 
@@ -591,3 +591,40 @@ Seen in the emulator with a forced win in every match. The RAM pokes are below; 
 - **Code space.**
   - `0x801080BC`–`0x801082BC` and `0x80156360`–`0x801564B0`: functions with no references that never run. This was checked by coverage over the earlier runs plus a whole staff roll and HARD finale on the original disc.
   - The existing `0x8010868C` / `0x80153AF4` areas also stay unused there.
+
+## Select screen icons and RESULT (branch experimental-arcade)
+
+Zangief and Dan are no longer hidden: they get icons on the select screen,
+and the Versus RESULT table lists them with separate counters. Code:
+`src/select.asm` and `src/result.asm`; the icon picture is built by
+`tools/zangief.py icon`.
+
+### RESULT (0x80138864)
+
+- **Counters.** 4 arrays × 11 words at 0x801D2678: wins side 0, wins side 1 (+0x2C), losses side 0 (+0x58), losses side 1 (+0x84); index = character. Zangief has his own 4 words (XP_ZST), updated instead of Dan's when his bit is set (xp_zinc, replacing the update at 0x801382B8).
+- **Lines.** A 12th line, ZANGIEF; DAN and ZANGIEF are always shown, AKUMA and DEVILOT when unlocked (12-entry copies of the name, column and line tables). Totals go from row 19 to 20, the menu from rows 22/24/26 to 23/25/27.
+- **Save.** His counters go in the unused tail of the save block (+0x380: 'ZGST', 4 words, sum), written by xp_rssave and read back by xp_rsload; an older save gives zero. CLEAR RESULT clears them too.
+
+### Icon grid
+
+- **Objects.** The icons are type 0x17 objects, subtype = character 0–7, made by 0x8013C29C (8 calls to 0x80114260(subtype, mode)). Their init (0x80113F2C) reads per subtype a delay (0x8016A840), a position (0x8016A850, y counted upwards) and an animation (0x8016A870, through 0x8010B734). Subtypes 8 (Zangief) and 9 (Dan) are added when MODE_NEXT is Versus/Arcade, with 10-entry tables and their own 2-step scripts.
+- **Tile lists.** 0x801667C4 + 0x94 × char: 9 tiles of the picture (u << 8 | v, x, y, attr; list y 0 is the bottom row), then 9 tiles of the white frame (icon 20 at 0,192, palette 11, navy inside), then 0xFFFF, 5. The picture's 0 pixels let the navy show.
+- **Icon page.** FIRST.EMI / FIRSTE.EMI entry 25, VRAM (704,0), 48×48 icons, 5 per row: 0–9 characters, 10–17 Dan's gag variants, 18 "?", 19 frame fill, 20 frame. **All of Dan's variants are used** by his gag animation (scripts 0x80167B84–0x80167C5C; (96,144) is its last frame, held 0x782 frames). The right-hand strip x 240–255, y 0–191 is empty: 12 free tiles.
+- **Zangief's icon.** Pocket Fighter /STAGE/SELECT.PAC frame 775 (3×3 cells, palette 634), found by matching its VRAM tiles against the decompressed cells. Its background and frame colours become transparent, it is clipped to the frame's inside and mapped to Dan's icon palette (10). It is written as 9 loose tiles in strip slots 0–8.
+- **Dan's icon.** His laughing variant (0,96). Its ponytail crosses the frame's top edge, so its two top-right tiles are replaced by copies clipped to the frame's inside (strip slots 9–10).
+
+### Cursor and screen
+
+- **Positions.** 0–3 top row, 4–7 bottom row; 8 = Zangief, 9 = Dan. The cursor/badge position table 0x8016A974 is relocated with two more entries (read at 0x80116150, 0x8011618C, 0x801161B8). Position → character goes through a 10-entry copy of CURSOR_CHARS; position 8 also sets his bit.
+- **Moves** (xp_move): Up on Chun-Li (1) / Sakura (2) → 8 / 9, only in Versus/Arcade; on 8/9, Down → 1/2, Left/Right swap.
+- **Down ring.** In Versus/Arcade it becomes Devilot → Akuma → Mei-Ling → Anita → cell; Street Puzzle keeps Dan after Akuma.
+- **Big portrait.** The portrait object (0x80114510) redraws only when the character differs from the one it shows (+0x58). Dan and Zangief are both character 10, so +0x58 now holds a key, character | 0x10 for Zangief.
+- **Logo and timers.** The logo's tile script (0x8016FACC) goes from row 5 to row 2. Arcade's STAGE n / FINAL STAGE scripts and digits move up by the same 3 rows, and their erase (0x8013CB38) covers rows 2–11. The select timers (0x8013C428 / 0x8013C4B4) move one column outwards.
+
+### Code space
+
+Functions with no references that never run (coverage: boot, menus, Versus
+with RESULT, Arcade to the HARD finale, Street Puzzle, option menus):
+0x801609C0, 0x80161170, 0x801653C0, 0x80163574, 0x80160FF4, 0x801618A4.
+
+- **Overlap found.** A first placement at 0x80152CAC overlapped Zangief's step-5 area (0x80152C14, 332 bytes) and crashed Versus. There is no overlap check in armips across `.area` blocks, so any new area has to be checked against the existing ones.

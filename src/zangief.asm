@@ -5,8 +5,7 @@
 ; real in Versus and Arcade: every test also checks the game mode, through
 ; XP_ZOK / XP_ZOKN (3 when MODE / MODE_NEXT is Versus or Arcade, set every
 ; frame by xp_frame; Street Puzzle, which is MODE 1 as Arcade, is excluded).
-;   select:  Down cycles ... Mei-Ling -> Anita -> Zangief -> cell character,
-;            Up walks back (Zangief -> Anita)
+;   select:  his own icon, cursor position 8 above Chun-Li (select.asm)
 ;   pattern: "Siberian Bear" (XP_ZPATTERN), via the pattern lookup 0x801350E4
 ;   damage:  index 11 in DMGTAB (send 90 %, receive 90 %), via xp_zchar
 ; Code space: 0x80163CDC, a 684-byte function with no references that never
@@ -68,18 +67,9 @@ xp_zg_dan:
 	j       xp_mv_cell
 	move    t3, zero
 
-; Anita, Down: Zangief in Versus / Arcade, else the cell character.
+; Anita, Down: the cell character.
+; (experimental-arcade: Zangief has his own icon, select.asm; Anita -> cell)
 xp_zg_anita:
-	lui     v1, hi(XP_ZOKN)
-	lbu     v1, lo(XP_ZOKN)(v1)
-	li      v0, 3
-	bne     v1, v0, @@cell
-	li      t2, ZG_CHAR
-	move    t3, zero
-	move    t9, zero
-	j       xp_mv_apply
-	li      t1, ZG_MAGIC
-@@cell:
 	j       xp_mv_cell
 	nop
 

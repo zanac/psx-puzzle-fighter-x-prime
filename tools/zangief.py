@@ -943,6 +943,72 @@ def build_select_name(select_emi, se0d):
     d[tbase + 32 * NAME_TONE + 4] = NAME_CENTER
     return bytes(d)
 
+# --- his icon on the select grid (experimental-arcade) ------------------------
+# The select grid's icons are 48x48 4bpp pictures on FIRST.EMI / FIRSTE.EMI
+# entry 25 (VRAM 704,0; 5 per row), drawn by the per-character tile lists
+# 0x801667C4 over a white frame whose inside is navy (FIRST.EMI icon 20,
+# palette 11), with the icon's 0 pixels transparent. Zangief gets Pocket
+# Fighter's grid icon (/STAGE/SELECT.PAC frame 775, palette 634) as 9 loose
+# 16x16 tiles in the page's empty right-hand strip (x 240-255, y 0-143;
+# the tile lists place every tile on its own, see xp_icon_zangief): picture
+# tile (column c, row r) goes to y = 16 * (3 * r + c). Its background and its own frame become
+# transparent (the SPF2T navy shows through), the rest is mapped to Dan's
+# icon palette (10), the closest of the select palettes to his colours.
+ICON_FRAME, ICON_PFPAL = 775, 634
+ICON_STRIP = 240          # x of the strip (must match src/select.asm)
+DAN_ICON = (0, 96)        # Dan's grid icon (src/select.asm xp_icon_dan)
+ICON_PAL = 10               # must match src/select.asm (attr 0x20 | ICON_PAL)
+ICON_DROP = (8, 12, 14, 15)  # PF background and frame colours
+
+def build_icon(selpac, first, preview=None):
+    e0 = P.pac_entries(selpac)
+    e = {0: e0[11], 1: e0[10], 2: e0[12]}
+    tbl = e[1]
+    words = struct.unpack_from('<%dI' % (len(tbl) // 4), tbl)
+    img = P.render(e, words, struct.unpack_from('<HBBHHHH', tbl, ICON_FRAME * 12))
+    c5 = lambda v: (v & 31, (v >> 5) & 31, (v >> 10) & 31)
+    src = [c5(struct.unpack_from('<H', e[2], ICON_PFPAL * 32 + 2 * i)[0]) for i in range(16)]
+    d = bytearray(first)
+    ents = emi_entries(d)
+    page, pals = ents[24][0], ents[26][0] + 0x1000      # icon page, icon palettes
+    dst = [c5(struct.unpack_from('<H', d, pals + ICON_PAL * 32 + 2 * i)[0]) for i in range(16)]
+    near = {}
+    for v in range(1, 16):
+        near[v] = min(range(1, 16), key=lambda k: sum((a - b) ** 2 for a, b in zip(src[v], dst[k])))
+    def get(x, y):
+        return (d[page + y * 128 + x // 2] >> (4 * (x & 1))) & 15
+    # inside of the white frame (icon 20 at 0,192: colour 7, navy)
+    inside = [[get(x, 192 + y) == 7 for x in range(48)] for y in range(48)]
+    px = [[0] * 48 for _ in range(48)]
+    for y in range(48):
+        for x in range(48):
+            v = img[y][x] & 15
+            if v and inside[y][x] and (v not in ICON_DROP or (v == 8 and 9 < x < 39 and 9 < y < 39)):
+                px[y][x] = near[v]          # (white 8 inside the face: his eyes)
+    def put(slot, tile):                    # tile: 16 rows of 16 colours
+        for y in range(16):
+            for x in range(0, 16, 2):
+                o = page + (16 * slot + y) * 128 + (ICON_STRIP + x) // 2
+                assert d[o] == 0, 'icon strip not empty'
+                d[o] = tile[y][x] | tile[y][x + 1] << 4
+    for r in range(3):
+        for c in range(3):
+            put(3 * r + c, [row[16 * c:16 * c + 16] for row in px[16 * r:16 * r + 16]])
+    # Dan's grid icon is his laughing variant (0,96), whose ponytail crosses
+    # the frame's top edge (fine in his gag animation, untidy on the grid):
+    # its two top-right tiles, clipped to the frame's inside, in slots 9-10
+    U, V = DAN_ICON
+    for k, c in enumerate((1, 2)):
+        put(9 + k, [[get(U + 16 * c + x, V + y) if inside[y][16 * c + x] else 0
+                     for x in range(16)] for y in range(16)])
+    if preview:
+        from PIL import Image
+        navy = (0, 4 * 8, 14 * 8)
+        im = Image.new('RGB', (48, 48))
+        im.putdata([tuple(c * 8 for c in dst[v]) if v else navy for r in px for v in r])
+        im.resize((192, 192), Image.NEAREST).save(preview)
+    return bytes(d)
+
 def voices_main(a):
     # zangief.py voices SE0AA.PAC SE_PL0A.EMI OUT.EMI [--wav DIR]
     rd = lambda p: open(p, 'rb').read()
@@ -971,6 +1037,10 @@ if __name__ == '__main__':
         out, n, size = build_end(open(a[1], 'rb').read(), open(a[2], 'rb').read(), preview=png)
         open(a[3], 'wb').write(out)
         print('%s: %d pieces, block 0x%X bytes' % (a[3], n, size)); sys.exit(0)
+    if a and a[0] == 'icon':      # zangief.py icon PF_SELECT.PAC FIRST.EMI OUT.EMI [--png P]
+        png = a[a.index('--png') + 1] if '--png' in a else None
+        out = build_icon(open(a[1], 'rb').read(), open(a[2], 'rb').read(), png)
+        open(a[3], 'wb').write(out); sys.exit(0)
     if a and a[0] == 'name':      # zangief.py name SELECT.EMI SE0D.PAC OUT.EMI
         out = build_select_name(open(a[1], 'rb').read(), open(a[2], 'rb').read())
         open(a[3], 'wb').write(out); sys.exit(0)

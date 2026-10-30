@@ -1,7 +1,7 @@
 # Super Puzzle Fighter II Turbo X" — PlayStation
 
 **X"** ("X double prime") is the **X' rebalance** ported to the PlayStation version of Super Puzzle Fighter II Turbo
-(NTSC-U, **SLUS-00418**), plus PSX-only additions. The headline addition is **Zangief**, taken from Pocket Fighter, as a full hidden character in Versus and Arcade.
+(NTSC-U, **SLUS-00418**), plus PSX-only additions. The headline addition is **Zangief**, taken from Pocket Fighter, as a full character in Versus and Arcade, with his own icon on the select screen.
 
 X' is David Sirlin's rebalance from Puzzle Fighter HD Remix. It was brought back to
 the original arcade game by [KScl/puzzle-fighter-x-prime](https://github.com/KScl/puzzle-fighter-x-prime).
@@ -27,10 +27,11 @@ From X' (the arcade rebalance):
 - Devilot, Akuma and Dan selectable without codes
 
 X" additions (PSX only):
-- **Zangief from Pocket Fighter**, a hidden character in Versus and Arcade:
+- **Zangief from Pocket Fighter**, a full character in Versus and Arcade:
   - his own sprites, animations, voices, portraits, name call, quotes, stage and music;
   - his own Arcade run and ending;
   - all of it built from your own Pocket Fighter disc (see [Zangief](#zangief)).
+- **Select screen:** Zangief and Dan get their own icons, on a new row above Chun-Li and Sakura (Versus and Arcade); the Versus RESULT screen always lists DAN and ZANGIEF, with separate counters
 - **Dan:** new "Gadoken" drop pattern (red spine: columns 1/3/5 red, mixed pairs between) instead of all red; sends 110 % and receives 110 %
 - **Versus stage selector:** RANDOM (default), NORMAL or a fixed stage (Zangief's castle included), chosen by P1 on the select screen
 - **Challenges:** when a second player joins an Arcade game, both players choose their character again
@@ -38,12 +39,12 @@ X" additions (PSX only):
 
 ## Zangief
 
-Zangief is the twelfth playable character, hidden like Mei-Ling and Anita.
-- **Picking him.** On the select screen's bottom row, keep pressing Down after Anita.
+Zangief is the twelfth playable character.
+- **Picking him.** On the select screen, press Up on Chun-Li: Zangief's icon is above her, and Dan's above Sakura.
 - **Where he plays.** Versus and Arcade.
 - **Where he comes from.** Everything of his comes from Pocket Fighter, converted at build time from your own disc: the repository and the release carry no game data.
 
-**Select and VS screens.** He has a portrait, a name label, a name call and a Counter Gem preview of his pattern. In Versus, the stage line offers his stage.
+**Select and VS screens.** He has an icon (Pocket Fighter's, set on the SPF2T frame), a portrait, a name label, a name call and a Counter Gem preview of his pattern. In Versus, the stage line offers his stage, and the RESULT screen keeps his wins and losses apart from Dan's.
 
 ![Zangief on the select screen and the VS screen](docs/screenshots/zangief_select.png)
 
@@ -74,8 +75,12 @@ He sends and receives 90 %, and drops the "Siberian Bear" pattern (3×2 blocks).
 
 ![Title screen](docs/screenshots/title.png)
 
+**Zangief and Dan on their own icons.** The PLAYER SELECT logo moves up and the two timers move outwards, to make room for a row with Zangief (above Chun-Li) and Dan (above Sakura). Up from Chun-Li or Sakura reaches them, Left and Right swap between the two, Down goes back to the grid. Dan's icon is his laughing face from the FINAL STAGE gag.
+
+![Zangief (P1) and Dan (P2) on their icons](docs/screenshots/select_icons.png)
+
 **Secret characters without codes.**
-- **The ring.** On the bottom row, Down cycles the cell through Devilot → Akuma → Dan → Mei-Ling → Anita → Zangief and back. Up walks the same ring backwards.
+- **The ring.** On the bottom row, Down cycles the cell through Devilot → Akuma → Mei-Ling → Anita and back. Up walks the same ring backwards. (In Street Puzzle, which has no Zangief/Dan row, Dan stays in the ring after Akuma.)
 - **Labels.** Mei-Ling and Anita get their own name labels, which the original select screen never had.
 
 ![Secret character cycle](docs/screenshots/select_cycle.png)
@@ -109,7 +114,8 @@ Done:
 - **Drop patterns.** New patterns for the five characters, Dan and Zangief, including the Counter Gem previews on the select screen.
 - **Damage formula.** It reproduces the arcade X' patch exactly. It was fuzz-tested in an emulator against a Python model of the arcade code.
 - **Diamond.** It always applies its penalty, so the diamond trick is gone.
-- **Character select.** Pressing Down on the bottom row cycles through Devilot, Akuma, Dan, Mei-Ling, Anita and Zangief. The select screen now has name labels for Mei-Ling, Anita and Zangief.
+- **Character select.** Zangief and Dan have their own icons on a new row. Pressing Down on the bottom row cycles through Devilot, Akuma, Mei-Ling and Anita. The select screen now has name labels for Mei-Ling, Anita and Zangief.
+- **Versus RESULT.** DAN and ZANGIEF are always listed, each with his own counters (saved on the memory card with the others); AKUMA and DEVILOT appear once used, and the totals and menu moved down to make room.
 - **Zangief.** He is complete in Versus and Arcade, ending included: see [Zangief](#zangief).
 - **Markers.** `X"` appears between the win counters during matches, and `X" BALANCE PATCH BY ZANAC` appears on the title screen.
 - **Codes.** The old secret-character codes are disabled; cycling replaces them.
@@ -186,9 +192,11 @@ always built by the Python tools from your discs.
 
 ## How to play the secret characters
 
-On the character select screen, move to the bottom row and keep pressing **Down**.
-- **Down** cycles the character on that cell through Devilot, Akuma, Dan, Mei-Ling, Anita and Zangief, then back to the cell's own character.
-- **Up**, while a secret character is shown, goes back one step in the same ring (Zangief → Anita → Mei-Ling → Dan → Akuma → Devilot → the cell's character). On the cell's own character, Up moves to the top row as usual.
+**Zangief and Dan** (Versus and Arcade) have their own icons: press **Up** on Chun-Li for Zangief, on Sakura for Dan. **Left/Right** swap between them, **Down** goes back to the grid.
+
+For the others, move to the bottom row and keep pressing **Down**.
+- **Down** cycles the character on that cell through Devilot, Akuma, Mei-Ling and Anita, then back to the cell's own character.
+- **Up**, while a secret character is shown, goes back one step in the same ring (Anita → Mei-Ling → Akuma → Devilot → the cell's character). On the cell's own character, Up moves to the top row as usual.
 - **Left or Right** return to the normal grid.
 - **Colours.** As in vanilla, the button used to confirm picks them: Circle or Triangle give the standard colours, Cross or Square the alternate ones.
 

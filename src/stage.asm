@@ -233,7 +233,7 @@ xp_stage:
 ; t4 = hi(ALT_BITS), t5 = player bit, t7/t8 = Mei-Ling/Anita bits.
 xp_up:
 	sltiu   v0, t0, 4
-	bnez    v0, @@vanilla           ; top row
+	bnez    v0, @@top               ; top row
 	lbu     t2, 0(a2)               ; character shown on the cell
 	nop
 	sltiu   v0, t2, 8
@@ -259,7 +259,7 @@ xp_up:
 	and     v1, t7, t5
 	beqz    v1, @@vanilla           ; plain Hsien-Ko
 	nop
-	j       xp_mv_apply             ; Mei-Ling -> Dan
+	j       xp_ringprev             ; Mei-Ling -> Dan / Akuma (select.asm)
 	li      t2, ZG_CHAR
 @@anita:
 	li      v0, 5
@@ -272,6 +272,9 @@ xp_up:
 	li      t2, 4
 @@cell:
 	j       xp_mv_cell
+	nop
+@@top:
+	j       xp_up_top               ; Chun-Li / Sakura -> Zangief / Dan (select.asm)
 	nop
 @@vanilla:
 	j       xp_mv_updown

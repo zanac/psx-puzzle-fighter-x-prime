@@ -90,7 +90,9 @@ for EMI in FIRST FIRSTE; do
 	python3 "$HERE/tools/extract.py" "$IN" "/DATA/$EMI.EMI" "$TMP/$EMI.EMI"
 	python3 "$HERE/tools/previews.py" "$TMP/SLUS_004.18.xp" "$TMP/$EMI.EMI" "$TMP/$EMI.EMI.pv" --chars 0,2,4,6,7,10,11
 	# select-screen name labels for Mei-Ling and Anita
-	python3 "$HERE/tools/labels.py" "$TMP/$EMI.EMI.pv" "$TMP/$EMI.EMI.xp"
+	python3 "$HERE/tools/labels.py" "$TMP/$EMI.EMI.pv" "$TMP/$EMI.EMI.lb"
+	# Zangief's icon on the select grid (Pocket Fighter's)
+	python3 "$HERE/tools/zangief.py" icon "$TMP/PF_SELECT.PAC" "$TMP/$EMI.EMI.lb" "$TMP/$EMI.EMI.xp"
 done
 ADDS=""
 for f in $NEWFILES; do ADDS="$ADDS +$f"; done

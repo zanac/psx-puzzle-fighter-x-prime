@@ -281,6 +281,8 @@ xp_notdone:
 ; CHARACTER SELECT
 ; Pressing Down while on the bottom row cycles the character on that cell:
 ;   cell char -> Devilot -> Akuma -> Dan -> Mei-Ling -> Anita -> cell char
+; (Versus / Arcade: Dan and Zangief have their own icons and leave the ring,
+; see select.asm)
 ; The cursor stays on the visible cell (there is no screen room for a third
 ; row). Up/Left/Right behave as in vanilla and restore the cell's character.
 ; Mei-Ling / Anita are Hsien-Ko / Donovan (4 / 5) plus the player's bit in
@@ -321,7 +323,9 @@ xp_move:
 	lbu     t8, lo(ALT_BITS + 1)(t4)    ; Anita bits
 	move    t3, zero                    ; bit to set in Mei-Ling bits
 	move    t9, zero                    ; bit to set in Anita bits
+	j       xp_selchk                   ; Zangief / Dan row (select.asm)
 	andi    a1, a1, 0xFFFF
+xp_mv_dir:
 	li      v0, 0x1000                  ; up
 	beq     a1, v0, xp_up               ; (stage.asm: Up cycles back)
 	addiu   t1, t0, -4
@@ -349,8 +353,8 @@ xp_move:
 xp_mv_not_dan:
 	bnez    v0, xp_mv_not_secret
 	li      v0, 4
-	b       xp_mv_apply
-	addiu   t2, t2, 1                   ; Devilot -> Akuma -> Dan
+	j       xp_ringnext                 ; Devilot -> Akuma -> Dan / Mei-Ling
+	addiu   t2, t2, 1
 xp_mv_not_secret:
 	bne     t2, v0, xp_mv_not_meiling
 	and     v1, t7, t5
@@ -384,9 +388,8 @@ xp_mv_moved:
 	sb      t1, 1(a2)
 	move    t0, t1
 xp_mv_cell:                            ; t0 = cursor position
-	la      v0, CURSOR_CHARS
-	addu    v0, v0, t0
-	lbu     t2, 0(v0)
+	j       xp_cellchar                 ; t2 = its character (select.asm)
+	nop
 
 xp_mv_apply:                                ; t2 = character, t3/t9 = alt bit to set
 	j       xp_zg_apply                 ; Mei-Ling bits + Zangief bit
@@ -607,5 +610,6 @@ xp_marker_clear:
 .include "src/files.asm"
 .include "src/zangief.asm"
 .include "src/result.asm"
+.include "src/select.asm"
 
 .close

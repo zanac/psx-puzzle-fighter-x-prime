@@ -21,8 +21,9 @@ e.run(1200); e.press(lr.START,4,120); sh('title')
 e.press(lr.START,4,120); e.save_state(P_('st_menu.state'))
 e.press(lr.DOWN,8,30); e.press(lr.DOWN,8,30); e.press(lr.CROSS,6,200); e.press(lr.START,6,100,port=1); e.run(200)
 e.save_state(P_('st_sel.state'))
-for i in range(5): e.press(lr.DOWN,4,30)              # P1 Ryu->Morrigan->...->Mei-Ling
-for i in range(6): e.press(lr.DOWN,4,30,port=1)      # P2 Ken->Felicia->...->Anita
+# Down ring in Versus / Arcade: cell -> Devilot -> Akuma -> Mei-Ling -> Anita
+for i in range(4): e.press(lr.DOWN,4,30)              # P1 Ryu->Morrigan->...->Mei-Ling
+for i in range(5): e.press(lr.DOWN,4,30,port=1)      # P2 Ken->Felicia->...->Anita
 R['sel']=(e.r8(0x801baac4),e.r8(0x801baac8),e.r8(0x801ae4d8),e.r8(0x801ae4d9))
 sh('select')
 charsel_to_match(e); e.run(30); sh('match')
@@ -76,14 +77,15 @@ for k in range(200):
 sh('arcade_late')
 R['arcade_opponents']=opp
 R['arcade_ok']=len(opp)>=4
-# Arcade as Zangief (Down x7 from Ryu: ... Anita, Zangief): a whole run.
+# Arcade as Zangief (his icon: Right, Up from Ryu): a whole run.
 # Felicia must be Zangief's 8th opponent, before
 # Dan (10) and the bosses; the run must reach the ending (staff roll).
 e.load_state(P_('st_menu.state'))
 e.press(lr.CROSS,6,200); e.press(lr.RIGHT,4,30); e.press(lr.CROSS,6,200)   # level HARD
 R['arcade_z_level']=e.r8(0x801baacf)
-for i in range(7): e.press(lr.DOWN,4,20)
-R['arcade_z_sel']=e.r8(0x801baac4)
+e.press(lr.RIGHT,4,20); e.press(lr.UP,4,20)
+R['arcade_z_sel']=(e.r8(0x801baac4),e.r8(0x801baac5))
+sh('arcade_z_select')
 e.press(lr.CROSS,6,30)
 opp=[]; zp1=False
 for k in range(260):
@@ -96,7 +98,7 @@ for k in range(260):
     if 9 in opp and len(opp)>=10: break
 sh('arcade_zangief')
 R['arcade_z_opponents']=opp
-R['arcade_z_ok']=zp1 and len(opp)>=10 and opp[7]==6 and opp[8]==10
+R['arcade_z_ok']=R['arcade_z_sel']==(10,8) and zp1 and len(opp)>=10 and opp[7]==6 and opp[8]==10
 # then his ending: the staff roll figure from his block (children with
 # graphics at 0x800A1000, records at +0x300), and on HARD the finale's 13th
 # object (index 12) drawn from his own file (graphics 0x80070000)
