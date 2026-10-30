@@ -551,9 +551,9 @@ xp_zpal3:
 ; yet, so in Versus it is loaded into the other player's banks right after
 ; SELECT.EMI (those banks are free there; the "loaded file" cache byte says
 ; so, and the match load then skips or redoes it as usual).
-; Code space: 0x80152C14 (332 bytes) and 0x8015515C (588 bytes), functions
-; with no references that never run (coverage: boot, menus, Versus select,
-; VS, match).
+; Code space: 0x80152C14 (332 bytes) and 0x8015515C-0x801554C4 (872
+; bytes), functions with no references that never run (coverage: boot,
+; menus, Versus select, VS, match).
 ; ============================================================================
 CACHE_P1  equ 0x801BF115        ; "loaded file" cache bytes (P2 at +1)
 DAN_PLIST equ 0x80189F24        ; Dan's portrait list
@@ -647,7 +647,7 @@ XP_ZPEND:
 .endarea
 
 .org 0x8015515C
-.area 0x24C, 0
+.area 0x801554C4 - 0x8015515C, 0         ; three never-run functions
 
 ; xp_zport: is side t8 (0 P1, 1 P2) showing Zangief's portrait, and where is
 ; his file? (Versus only: MODE_NEXT = 3 on the select screen, MODE = 3 with
@@ -804,6 +804,7 @@ xp_zportpal:
 ; (The Zangief bits are only ever set on the Versus select screen.)
 xp_zname:
 	andi    a0, a0, 0xFF
+	andi    a1, a1, 0xFF                ; as vanilla
 	sll     v0, a0, 2
 	lui     at, 0x8017
 	addu    at, at, v0
@@ -821,6 +822,94 @@ xp_zname:
 @@go:
 	j       0x80105CC0
 	move    a0, v0
+
+; in-match HUD name (built once per match by 0x8014CD50): v = the name's
+; row in the HUD page (table 0x8018BF38), u = 0x80.. (P1) / 0xC0.. (P2).
+; ZANGIEF is MORRIGAN's P2 copy (row 48, u 0xC0; tools/labels.py), so P2
+; Morrigan reads her P1 copy. In: v0 = character. Out: v0 = row; the tile's
+; u byte (P1 -1(s0), P2 -1(s1)) is fixed up. Keeps v1. Uses at, t9.
+xp_zhud1:                               ; 0x8014CE38
+	b       xp_zhud_test
+	li      t9, 1
+xp_zhud2:                               ; 0x8014CE60
+	bnez    v0, @@p2z                   ; P2 Morrigan: her P1 copy
+	nop
+	lbu     at, -1(s1)
+	nop
+	addiu   at, at, -0x40
+	sb      at, -1(s1)
+@@p2z:
+	li      t9, 2
+xp_zhud_test:
+	li      at, ZG_CHAR
+	bne     v0, at, @@tab
+	lui     at, hi(MODE)
+	lbu     at, lo(MODE)(at)
+	nop
+	xori    at, at, 3
+	bnez    at, @@tab
+	lui     at, hi(XP_ZBITS)
+	lbu     at, lo(XP_ZBITS)(at)
+	nop
+	and     at, at, t9
+	beqz    at, @@tab
+	li      at, 1
+	bne     t9, at, @@row               ; P2 already reads u 0xC0..
+	nop
+	lbu     at, -1(s0)
+	nop
+	addiu   at, at, 0x40
+	sb      at, -1(s0)
+@@row:
+	jr      ra
+	li      v0, 48
+@@tab:
+	lui     at, 0x8019
+	addu    at, at, v0
+	jr      ra
+	lbu     v0, -0x40C8(at)
+
+; WINNER screen icon palette (0x8011008C, replaces jal 0x80110828; Dan's
+; own path, taken for character 10): a0 = colour set, a1 = palette slot
+; code, s0 = the winner's player struct. Zangief: palette 0 of the set from
+; his palette block instead of Dan's (same slot computation as 0x80110828).
+xp_zwinpal:
+	li      at, P1_STRUCT
+	beq     s0, at, @@side
+	li      t9, 1
+	li      t9, 2
+@@side:
+	lui     at, hi(MODE)
+	lbu     at, lo(MODE)(at)
+	nop
+	xori    at, at, 3
+	bnez    at, @@van
+	lui     at, hi(XP_ZBITS)
+	lbu     at, lo(XP_ZBITS)(at)
+	nop
+	and     at, at, t9
+	beqz    at, @@van
+	li      at, 1
+	beq     t9, at, @@p1
+	lui     v0, hi(BANK_P1 + ZG_PALOFF)
+	lui     v0, hi(BANK_P2 + ZG_PALOFF)
+	b       @@pal
+	addiu   v0, v0, lo(BANK_P2 + ZG_PALOFF)
+@@p1:
+	addiu   v0, v0, lo(BANK_P1 + ZG_PALOFF)
+@@pal:
+	sll     a0, a0, 7
+	addu    a0, v0, a0
+	sll     a1, a1, 24
+	sra     t9, a1, 29
+	srl     a1, a1, 24
+	andi    a2, a1, 0x1F
+	move    a3, a2
+	j       0x80108C68
+	addiu   a1, t9, 3
+@@van:
+	j       0x80110828
+	nop
 
 .align 4
 XP_ZK:
@@ -971,6 +1060,18 @@ XP_ZSEL:
 	nop
 .org 0x8013CB88
 	j       xp_zname
+	nop
+.org 0x8011008C
+	jal     xp_zwinpal
+.org 0x8014CE38
+	jal     xp_zhud1
+	nop
+	nop
+	nop
+.org 0x8014CE60
+	jal     xp_zhud2
+	nop
+	nop
 	nop
 .org 0x8016EFFA                         ; Dan's voice table, unused indices 7/8
 	.byte   14, 15                  ; Zangief's "in trouble" cries (ZG_EVENTS)

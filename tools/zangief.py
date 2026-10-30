@@ -403,6 +403,107 @@ def build_portraits(selpac, gfx_base):
     blk += b''.join(recs)
     return bytes(blk), bytes(gfx), shows
 
+# --- WINNER screen (step 5) ---------------------------------------------------
+# The WINNER screen draws, from the winner's own record bank, one of four win
+# quotes (frames 239-242: text strips, two lines of 8x16 monospace text) and a
+# small icon (frame 246); Dan's file also has effect frames 243-245. Every
+# index up to 246 must hold a valid record (an empty one where Zangief has
+# nothing). The quotes are set with the glyphs of Dan's own quotes (only the
+# letters those contain).
+WIN_QUOTES = (("Ahahaha! I crush you like a", "tin can! You are too tiny!"),
+              ("Dance with me again when you", "grow some muscles!"),
+              ("Gems or no gems! Strength", "wins in the end!"),
+              ("Ahahaha! Strong muscles win", "again! I am the strongest!"))
+DAN_QUOTES = (("I'll make you cry like I did when", "my daddy died!"),
+              ("Amateur! Go home and practice", "dragon punches!"),
+              ("I thought I taught you well.", "You know nothing! Dummy!"),
+              ("Yeahhh! I'm the strongest there", "is! But don't tell Sagat..."))
+N_FRAMES = 247              # Dan's file: frames 0-246
+ICON_SRC = (96, 20, 196, 120)   # PF select art (mirrored): his face
+# (frame 246 is drawn with the character's body palette, as for Dan: see
+# xp_zwinpal)
+
+def dan_frame_pixels(template, n):
+    import spf_sprites as SP
+    e = SP.entries(template)
+    return SP.frame(e[0], SP.records(e[1])[n])
+
+def quote_font(template):
+    # the glyphs are not boxed: take each letter where its neighbours are
+    # spaces if possible, so no stray pixels come along
+    font, score = {}, {}
+    for k, lines in enumerate(DAN_QUOTES):
+        _, px = dan_frame_pixels(template, 239 + k)
+        for j, text in enumerate(lines):
+            for i, ch in enumerate(text):
+                if ch == ' ':
+                    continue
+                sc = (i > 0 and text[i - 1] != ' ') + (i + 1 < len(text) and text[i + 1] != ' ')
+                if ch not in font or sc < score[ch]:
+                    font[ch] = [row[8 * i:8 * i + 8] for row in px[16 * j:16 * j + 16]]
+                    score[ch] = sc
+    return font
+
+def cells_record(px, x, y, gfx_off):
+    """Index image (multiple of 16 in both sizes) -> (record without offset
+    word, LZ bytes); cells as in make_record (row-major, present cells only)."""
+    h, w = len(px) // 16, len(px[0]) // 16
+    cells, mask = [], []
+    for cy in range(h):
+        for cx in range(w):
+            cell = [row[cx * 16:cx * 16 + 16] for row in px[cy * 16:cy * 16 + 16]]
+            present = any(any(r) for r in cell)
+            mask.append(present)
+            if present:
+                cells.append(cell)
+    if not cells:
+        mask = [False] * len(mask)
+        cells = [[[0] * 16 for _ in range(16)]]
+    units = (len(cells) + 15) // 16 * 16
+    rows = [[0] * 256 for _ in range(units)]
+    for k, cell in enumerate(cells):
+        for yy in range(16):
+            rows[(k // 16) * 16 + yy][(k % 16) * 16:(k % 16) * 16 + 16] = cell[yy]
+    hw = lzh.from_pixels(rows)
+    lz = lz_fast(hw)
+    words = [0] * 8
+    for i, m in enumerate(mask):
+        if m:
+            words[i // 32] |= 1 << (31 - i % 32)
+    rec = struct.pack('<IhhBBBB', gfx_off, x, y, h, w, units, 0x40) + struct.pack('<8I', *words)
+    return rec, lz
+
+def winner_frames(template, cols, selpac, gfx_off):
+    """-> {frame index: record}, LZ bytes (frames 239-242 quotes, 246 icon,
+    and the shared empty record, returned under key None)"""
+    from PIL import Image
+    font = quote_font(template)
+    out, gfx = {}, bytearray()
+    def add(px, x, y):
+        rec, lz = cells_record(px, x, y, gfx_off + len(gfx))
+        gfx.extend(lz + bytes(-len(lz) % 4))
+        return rec
+    out[None] = add([[0] * 16 for _ in range(16)], 0, 0)
+    for k, lines in enumerate(WIN_QUOTES):
+        w = max(len(t) for t in lines) * 8
+        w = (w + 15) // 16 * 16
+        px = [[0] * w for _ in range(32)]
+        for j, text in enumerate(lines):
+            for i, ch in enumerate(text):
+                if ch == ' ':
+                    continue
+                g = font[ch]                    # KeyError: no such glyph in Dan's quotes
+                for yy in range(16):
+                    px[16 * j + yy][8 * i:8 * i + 8] = g[yy]
+        out[239 + k] = add(px, 0, 0)
+    if selpac:
+        face = pf_select_art(selpac).crop(ICON_SRC).resize((32, 32), Image.LANCZOS)
+        cache = {}
+        px = [[(1 + nearest(cols, p[:3], cache)) if p[3] > 128 else 0 for p in
+               [face.getpixel((x, y)) for x in range(32)]] for y in range(32)]
+        out[246] = add(px, -16, -16)
+    return out, bytes(gfx)
+
 def build(pac, mdl, first, template, exe, sheet=None, selpac=None):
     pf = PFFrames(pac)
     anims = build_anims(mdl)
@@ -493,6 +594,13 @@ def build(pac, mdl, first, template, exe, sheet=None, selpac=None):
     lst += b''.join(struct.pack('<I', t) for t in tails)
     lst += struct.pack('<II', base, hit_hi)
     lst += struct.pack('<II', hit_hi, calm_hi)          # idle 0 + pinch 1 scripts
+    # WINNER screen frames, and a valid (empty) record at every index up to 246
+    wf, wgfx = winner_frames(template, cols, selpac, len(gfx))
+    gfx += wgfx
+    assert len(recs) <= 239, len(recs)
+    for n in range(len(recs), N_FRAMES):
+        recs.append(wf.get(n, wf[None]))
+    assert len(recs) * 44 <= PALOFF
     e1 = bytearray(b''.join(recs))
     e1 += bytes(PALOFF - len(e1)) + pals
     e1 += bytes(LISTOFF - len(e1)) + lst + scripts

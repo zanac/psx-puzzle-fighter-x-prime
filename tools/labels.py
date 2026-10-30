@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Build the character-select name labels for Mei-Ling, Anita and Zangief.
+"""Build the character-select name labels for Mei-Ling, Anita and Zangief,
+and Zangief's in-match HUD name (see put_hud_name).
 
 The labels are LZ-compressed 4bpp strips (256x16, see lzh.py) in FIRST.EMI /
 FIRSTE.EMI: a graphics bank (container entry 30, file offset 0xC7800, loaded
@@ -109,6 +110,89 @@ def put_stream(emi, n, rows, start, room):
     assert lzh.to_pixels(lzh.decode(emi, BANK + start)[0]) == rows
     return len(data)
 
+# --- in-match HUD name (ZANGIEF) -------------------------------------------------
+# The match HUD draws each player's name as four 16x16 sprites from a texture
+# page uploaded at boot (FIRST.EMI entry 25: VRAM 960,0, 4bpp, 256x256): P1
+# names at u 128-191 (left-aligned), P2 at u 192-255 (right-aligned), one
+# 16-pixel row per character (table 0x8018BF38). The page has no blank
+# 64x16 block, so ZANGIEF takes MORRIGAN's P2 copy (row 48, u 192-255), and
+# P2 Morrigan uses her P1 copy, which only differs by one pixel of alignment
+# (xp_zhud). ZANGIEF is assembled from the other names' letters plus a
+# hand-drawn Z in the same italic, outlined style (outline shades 9/e/d/c by
+# row, 1 = shadow).
+HUD_PAGE = 0xAD800              # FIRST.EMI / FIRSTE.EMI entry 25
+HUD_ROW = 48                    # MORRIGAN
+HUD_OUTLINE = (9, 0xE, 0xD, 0xC, 1)
+HUD_ROWS = {'DAN': 208, 'MORRIGAN': 48, 'HSIEN-KO': 112, 'FELICIA': 144}
+# (name row, first column, end column at the bottom (row 11) of the P1 name,
+# u - 128); the letters lean right by one column every three rows
+HUD_GLYPHS = {'A': ('DAN', 17, 26), 'N': ('DAN', 25, 34), 'G': ('MORRIGAN', 37, 46),
+              'I': ('HSIEN-KO', 16, 21), 'E': ('HSIEN-KO', 20, 30), 'F': ('FELICIA', 3, 11)}
+HUD_Z = ["          ",
+         "          ",
+         "9999999999",
+         "9555555559",
+         "9999997559",
+         "     e75e ",
+         "    e64e  ",
+         "   e64e   ",
+         "  d47d    ",
+         " d33dddddd",
+         "d333333333",
+         "c22222222c",
+         "cccccccccc",
+         "1111111111",
+         " 11111111 ",
+         "          "]
+
+def hud_slant(y):
+    return (11 - y) // 3
+
+def hud_name(page, text):
+    px = lambda x, y: (page[y * 128 + x // 2] >> 4) if x & 1 else (page[y * 128 + x // 2] & 15)
+    can = [[0] * 16 for _ in range(80)]
+    cur = 0
+    for ch in text:
+        if ch == 'Z':
+            w = len(HUD_Z[0])
+            g = [[0] * 16 for _ in range(w + 4)]
+            for y in range(16):
+                for x, c in enumerate(HUD_Z[y]):
+                    if c != ' ':
+                        g[x + hud_slant(y) + 1][y] = int(c, 16)
+        else:
+            n, a, b = HUD_GLYPHS[ch]
+            v, w = HUD_ROWS[n], b - a
+            g = [[0] * 16 for _ in range(w + 4)]
+            for y in range(2, 15):
+                for x in range(a, b):
+                    c = px(128 + x + hud_slant(y), v + y)
+                    if c not in (0xA, 0xB):             # the lightning behind short names
+                        g[x - a + hud_slant(y) + 1][y] = c
+        for x, colm in enumerate(g):
+            for y, q in enumerate(colm):
+                p = can[cur + x][y]
+                if q and (p == 0 or (p in HUD_OUTLINE and q not in HUD_OUTLINE)):
+                    can[cur + x][y] = q
+        cur += w - 1
+    used = max(x for x in range(80) if any(can[x])) + 1
+    assert used <= 62, used
+    return can[:used]
+
+def put_hud_name(emi, orig):
+    page = orig[HUD_PAGE:HUD_PAGE + 0x8000]
+    cols = hud_name(page, 'ZANGIEF')
+    def put(x, y, c):
+        o = HUD_PAGE + y * 128 + x // 2
+        emi[o] = (emi[o] & 0x0F) | (c << 4) if x & 1 else (emi[o] & 0xF0) | c
+    x0 = 256 - 2 - len(cols)                    # right-aligned, as P2 names
+    for y in range(2, 15):
+        for x in range(192, 256):
+            put(x, HUD_ROW + y, 0)
+        for x, colm in enumerate(cols):
+            put(x0 + x, HUD_ROW + y, colm[y])
+    return cols
+
 def main(argv):
     orig = open(argv[0], 'rb').read()      # glyph source, never modified
     emi = bytearray(orig)
@@ -158,6 +242,8 @@ def main(argv):
             continue
         if n not in imgs:
             assert lzh.decode(emi, BANK + record(emi, n))[0] == lzh.decode(orig, BANK + record(orig, n))[0]
+    # 5. ZANGIEF's in-match HUD name
+    put_hud_name(emi, orig)
     if '--preview' in argv:
         from PIL import Image
         pal = [(0, 0, 0), (144, 112, 160), (208, 144, 192), (240, 176, 208), (240, 192, 224),

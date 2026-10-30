@@ -264,3 +264,73 @@ No SPF2T character has a voice on states 1/2. Zangief now gets one, through the 
 Correction to the voice roles: Dan's script cues use voice-table indices 1–6 = ids 25–30, so slots 1, 2 and 8 are also attack / super voices (states 11, 13, 12, 14), not only "unclear" or "opponent K.O.".
 
 The current voice assignment, slot by slot, is in [ZANGIEF-VOICES.md](ZANGIEF-VOICES.md).
+
+## Step 5: select, VS and win screens (done)
+
+Everything below is only active in Versus with Zangief's bit set, and only in builds made with `XP_PF`.
+
+### Big portrait (select and VS)
+
+- **How the game draws it.** A portrait is a set of "child" sprites (0x1C-byte objects at `0x801B5C64`, drawn by `0x8010CA04`). They are created by `0x80123BAC` from a per-character list: table `0x8018B66C`, entries of u16 count, then (frame, palette, x, y). Dan's list is entry 20 at `0x80189F24` (frames 143–146 of FIRST.EMI, palettes 0–3). The children take the parent's graphics and record banks.
+- **Palettes.** `0x8010773C(side, character, row)` copies 10 palettes from FIRST.EMI to the side's portrait slots (P1 slot 0x30 = palettes 0x23.., P2 slot 0xD0 = 0x2D..). Row 0 is the select screen, row 1 the VS screen. Palette 3 of a side is rewritten by the game, so Zangief's quadrants use palettes 0, 1, 2 and 4.
+- **Both screens use the same list.**
+- **Zangief's art.** Pocket Fighter `/STAGE/SELECT.PAC` frame 554 (palettes from 586, one per cell palette offset), mirrored to face right.
+  - Select: a close-up (scale 0.55, face and fists), placed in the part of the 128×112 box the screen shows.
+  - VS: the whole art (scale 0.5).
+  - Each portrait is 4 quadrant records with their own 15-colour palette (k-means quantisation).
+- **Where it lives.** A block at the start of his graphics entry (`tools/zangief.py` `build_portraits`): two lists, two palette rows of 10, and 8 records. The record bank is full, and record offsets are relative to the graphics entry anyway.
+- **Hooks.**
+  - `xp_zlist` at `0x80123BF0`: Dan's list becomes his select or VS list.
+  - `xp_zkid` at `0x80123C34`: the children take his banks.
+  - `xp_zportpal` at `0x8010773C`: his palettes.
+  - `xp_zport` finds the banks holding his file and tells the screens apart: on the select screen a "loaded file" cache byte is 0xFF; on the VS screen MODE = 3 and MODE_NEXT = 0.
+
+### His file on the select screen
+
+- **When it loads.** The select screen has no data of his. In Versus his file is loaded into the banks SELECT.EMI did not take, right after SELECT.EMI: `xp_zselload` at `0x8012BF7C` queues it.
+- **Waiting for it.** Loads are asynchronous: `0x801043C0` starts a load, `0x8010436C` runs it once a frame, and `0x80104354` says "busy". The select scene waits for the loader at `0x80128768`, and `xp_zselbusy` (replacing that call) starts his load once SELECT.EMI is in and reports busy until it is done.
+- **Cache byte and load destinations.** His cache byte is set to group 11, so the match load skips it or redoes it as usual. The load destinations `0x801B8180/84` are put back afterwards.
+- **Why the wait is needed.** Starting the second load while the first one is running corrupts SELECT.EMI.
+
+### Select-screen chibi
+
+- **How the game draws it.** States 23 (choosing) and 24 (chosen) start through `0x80136400`, which picks SELECT.EMI's banks (`0x80123960`).
+- **Zangief's chibi.**
+  - `xp_zselst` gives him his own state 23/24 scripts from his file (23 = stance, 24 = arms up).
+  - `xp_zselbank` (at `0x8013648C`) gives him his banks.
+  - `xp_zchibipal` (at `0x8010789C`) gives him his palette, colour set as chosen.
+  - While the cursor is on him, his own colours are shown (set 1). The cursor-move call is told apart by its return address, `xp_mv_ret`.
+
+### Names
+
+- **Select label:** already done in step 2 (label 0x40).
+- **VS label:** the same setter as the select label. `xp_labelkey2` now also accepts MODE = 3 with MODE_NEXT = 0.
+- **Match HUD.** Four 16×16 sprites per player, built once by `0x8014CD50` from a 256×256 4bpp page (FIRST.EMI entry 25, VRAM 960,0).
+  - Layout: P1 names are left-aligned at u 128–191, P2 names right-aligned at u 192–255, and the row comes from table `0x8018BF38`.
+  - Space: the page has no free 64×16 block, so ZANGIEF replaces MORRIGAN's P2 copy (row 48). P2 Morrigan reads her P1 copy (one pixel of alignment difference). Hooks: `xp_zhud1/2` at `0x8014CE38/60`.
+  - Art: the name is built from the other names' letters plus a hand-drawn Z (`tools/labels.py` `put_hud_name`).
+- **Name call on confirm.**
+  - The voice comes from `0x8013CB88(character, side)` through table `0x8016FED4` (Dan = id 0x1A), out of SELECT.EMI's sound bank.
+  - Ids 0x14 and 0x19 are never used by the US game. Id 0x14 (program 1, tone 20, VAG 13) gets Pocket Fighter's "Zangief!" (`/SE/SE0D.PAC` VAG 4), resampled to fit VAG 13 (nothing moves, tone centre 79). Built by `tools/zangief.py name`, which uses the ADPCM encoder in `tools/vab.py`.
+  - `xp_zname` picks id 0x14.
+
+### WINNER screen
+
+- **What the game draws.** The WINNER screen draws, from the winner's own record bank:
+  - one of four win quotes: frames 239–242, text strips with two lines of 8×16 text;
+  - a small icon: frame 246.
+- **Dan's effect frames.** Dan's file also has effect frames 243–245.
+- **The bug this caused.** Zangief's file had about 70 frames. The higher indices were zero records pointing at graphics offset 0, which became the portrait block after this step. The game then decoded the block as LZ, and the match ending crashed (and the K.O. effect was missing).
+- **The fix.** Every index up to 246 is now valid: an empty record where he has nothing, his own quotes and icon where the screen needs them.
+- **Quotes.** Set with the glyphs of Dan's own quotes (`WIN_QUOTES` in `tools/zangief.py`; only letters those contain, so no f, b, v, x, z, q, j or commas).
+- **Icon palette.** The icon is drawn with Dan's body palette (Dan's own path at `0x80110088`). `xp_zwinpal` loads palette 0 of Zangief's colour set instead.
+- **RESULT table.** As agreed, his wins count as Dan's on the RESULT table.
+
+### Code space
+
+New never-run, unreferenced functions:
+- `0x80152C14` (332 bytes);
+- `0x8015515C`–`0x801554C4` (three functions, 872 bytes);
+- `0x8013BBB4` (308 bytes).
+
+All are checked with coverage over boot, menus, Versus select, VS and a match.
