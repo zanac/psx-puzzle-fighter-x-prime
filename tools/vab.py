@@ -46,6 +46,36 @@ def decode_vag(b):
             break
     return out
 
+def encode_blocks(samples):
+    """PCM (16-bit ints) -> PSX ADPCM blocks (flags 0), the exact inverse
+    model of decode_vag: best filter/shift per 28-sample block."""
+    out, s1, s2 = bytearray(), 0, 0
+    samples = list(samples) + [0] * (-len(samples) % 28)
+    for i in range(0, len(samples), 28):
+        blk = samples[i:i + 28]
+        best = None
+        for f in range(5):
+            k0, k1 = COEF[f]
+            for sh in range(13):
+                a1, a2, err, nib = s1, s2, 0, []
+                for x in blk:
+                    pred = (a1 * k0 + a2 * k1) // 64
+                    n = ((x - pred) << sh) >> 12 if sh <= 12 else 0
+                    # round to nearest
+                    r = (x - pred) * (1 << sh) / 4096.0
+                    n = max(-8, min(7, int(round(r))))
+                    v = max(-32768, min(32767, ((n << 12) >> sh) + pred))
+                    err += (v - x) ** 2
+                    nib.append(n & 15); a2, a1 = a1, v
+                    if best is not None and err >= best[0]:
+                        break
+                else:
+                    if best is None or err < best[0]:
+                        best = (err, f, sh, nib, a1, a2)
+        err, f, sh, nib, s1, s2 = best
+        out += bytes([f << 4 | sh, 0]) + bytes(nib[j] | nib[j + 1] << 4 for j in range(0, 28, 2))
+    return out
+
 def vags(vh, vb):
     out, p = [], 0
     for i in range(1, vh['vs'] + 1):

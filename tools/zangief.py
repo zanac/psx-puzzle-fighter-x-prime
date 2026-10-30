@@ -28,6 +28,7 @@ Pocket Fighter, not part of the frames).
 
 usage: zangief.py ZANGIEF.PAC PL09A.MDL FIRST.EMI PL9A_OBJ.EMI SLUS_004.18 OUT.EMI [--sheet PNG]
        zangief.py voices SE0AA.PAC SE_PL0A.EMI OUT.EMI [--wav DIR]   (SE_PL0B.EMI)
+       zangief.py name SELECT.EMI SE0D.PAC OUT.EMI    (his name call on the select screen)
 """
 import os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -579,6 +580,52 @@ def build_voices(pf_se, dan_se):
     out += body + bytes(-len(body) % 0x800)
     return bytes(out)
 
+# --- name call on the select screen (step 5) ----------------------------------
+# Confirming a character plays its name from SELECT.EMI's sound bank (sound id
+# from the per-character table 0x8016FED4, Dan = 0x1A). Ids 0x14 and 0x19 are
+# never used by the US game; id 0x14 (program 1, tone 4 = tone 20, VAG 13)
+# gets Pocket Fighter's "Zangief!" (/SE/SE0D.PAC VAG 4), resampled so it fits
+# VAG 13's size (nothing else in the bank moves), see xp_zname.
+NAME_ID, NAME_TONE, NAME_VAG = 0x14, 20, 13
+PF_NAME = 4                 # SE0D.PAC VAG number
+NAME_CENTER = 79            # names play at 11025 Hz with centre 72
+
+def build_select_name(select_emi, se0d):
+    import vab
+    d = bytearray(select_emi)
+    ents = emi_entries(d)
+    vh = vab.parse_vh(d, ents[0 + 1][0])
+    o2, s2 = ents[2]
+    # source: Pocket Fighter sample at its own rate
+    pv = vab.parse_vh(se0d, 0x1000)
+    off = 0x1000 + ((pv['hdr_end'] + 0x7FF) & ~0x7FF)
+    src = vab.decode_vag(vab.vags(pv, se0d[off:])[PF_NAME - 1])
+    t = [t for t in pv['tones'] if t['vag'] == PF_NAME][0]
+    rate_in = 44100 * 2 ** ((t['min'] - t['center']) / 12)
+    rate_out = 11025 * 2 ** ((72 - NAME_CENTER) / 12)
+    n = int(len(src) * rate_out / rate_in)
+    pcm = []
+    for i in range(n):              # linear resampling
+        p = i * rate_in / rate_out
+        j = int(p); f = p - j
+        a = src[j]; b = src[j + 1] if j + 1 < len(src) else 0
+        pcm.append(int(a + (b - a) * f))
+    # slot: zero block, data (first flagged 4, last 1), silent end block 7
+    size = vh['sizes'][NAME_VAG]
+    room = (size // 16 - 2) * 28
+    assert len(pcm) <= room, (len(pcm), room)
+    blocks = bytearray(vab.encode_blocks(pcm))
+    blocks += bytes(size - 32 - len(blocks))
+    blocks[1] = 4
+    blocks[-15] = 1
+    vag = bytes(16) + bytes(blocks) + bytes([0, 7]) + bytes(14)
+    assert len(vag) == size
+    p = o2 + sum(vh['sizes'][1:NAME_VAG])
+    d[p:p + size] = vag
+    tbase = ents[1][0] + 32 + 128 * 16
+    d[tbase + 32 * NAME_TONE + 4] = NAME_CENTER
+    return bytes(d)
+
 def voices_main(a):
     # zangief.py voices SE0AA.PAC SE_PL0A.EMI OUT.EMI [--wav DIR]
     rd = lambda p: open(p, 'rb').read()
@@ -602,6 +649,9 @@ if __name__ == '__main__':
     a = sys.argv[1:]
     if a and a[0] == 'voices':
         voices_main(a[1:]); sys.exit(0)
+    if a and a[0] == 'name':      # zangief.py name SELECT.EMI SE0D.PAC OUT.EMI
+        out = build_select_name(open(a[1], 'rb').read(), open(a[2], 'rb').read())
+        open(a[3], 'wb').write(out); sys.exit(0)
     if len(a) < 6:
         print(__doc__); sys.exit(1)
     sheet = a[a.index('--sheet') + 1] if '--sheet' in a else None

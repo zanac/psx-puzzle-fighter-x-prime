@@ -798,6 +798,30 @@ xp_zportpal:
 	j       0x80107744
 	sw      s1, 0x14(sp)
 
+; name call on confirm (0x8013CB88 entry): a0 = character, a1 = side.
+; Zangief -> sound id 0x14 (his name, put into SELECT.EMI's bank by
+; tools/zangief.py name). Tail-calls the vanilla player 0x80105CC0.
+; (The Zangief bits are only ever set on the Versus select screen.)
+xp_zname:
+	andi    a0, a0, 0xFF
+	sll     v0, a0, 2
+	lui     at, 0x8017
+	addu    at, at, v0
+	lw      v0, -0x12C(at)          ; vanilla id (table 0x8016FED4)
+	li      at, ZG_CHAR
+	bne     a0, at, @@go
+	lui     at, hi(XP_ZBITS)
+	lbu     at, lo(XP_ZBITS)(at)
+	sltu    t8, zero, a1            ; side (the player tests a1 != 0 too)
+	srlv    at, at, t8
+	andi    at, at, 1
+	beqz    at, @@go
+	nop
+	li      v0, 0x14
+@@go:
+	j       0x80105CC0
+	move    a0, v0
+
 .align 4
 XP_ZK:
 	.word   0, 0                    ; portrait block, graphics (0 = Dan's)
@@ -944,6 +968,9 @@ XP_ZSEL:
 	jal     xp_zselbank
 .org 0x8010789C
 	j       xp_zchibipal
+	nop
+.org 0x8013CB88
+	j       xp_zname
 	nop
 .org 0x8016EFFA                         ; Dan's voice table, unused indices 7/8
 	.byte   14, 15                  ; Zangief's "in trouble" cries (ZG_EVENTS)

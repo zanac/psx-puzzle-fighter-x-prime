@@ -30,6 +30,7 @@ python3 "$HERE/tools/extract.py" "$IN" /SLUS_004.18 "$TMP/SLUS_004.18"
 python3 "$HERE/tools/checkexe.py" "$TMP/SLUS_004.18"
 NEWFILES=${XP_NEWFILES:-}
 ZG_HAVE=0
+SELREPL=""
 if [ -n "${XP_PF:-}" ]; then
 	# Zangief's in-match file, from Pocket Fighter (new file ids 0x56, 0x57)
 	python3 "$HERE/tools/extract.py" "$XP_PF" /PLAYER/ZANGIEF.PAC "$TMP/ZANGIEF.PAC"
@@ -45,6 +46,11 @@ if [ -n "${XP_PF:-}" ]; then
 	python3 "$HERE/tools/extract.py" "$IN" /DATA/SE_PL0A.EMI "$TMP/SE_PL0A.EMI"
 	python3 "$HERE/tools/zangief.py" voices "$TMP/SE0AA.PAC" "$TMP/SE_PL0A.EMI" "$TMP/SE_PL0B.EMI"
 	NEWFILES="PL0B_OBJ.EMI=$TMP/PL0B_OBJ.EMI SE_PL0B.EMI=$TMP/SE_PL0B.EMI $NEWFILES"
+	# his name call on the select screen (SELECT.EMI's sound bank)
+	python3 "$HERE/tools/extract.py" "$XP_PF" /SE/SE0D.PAC "$TMP/SE0D.PAC"
+	python3 "$HERE/tools/extract.py" "$IN" /DATA/SELECT.EMI "$TMP/SELECT.EMI"
+	python3 "$HERE/tools/zangief.py" name "$TMP/SELECT.EMI" "$TMP/SE0D.PAC" "$TMP/SELECT.EMI.xp"
+	SELREPL="/DATA/SELECT.EMI=$TMP/SELECT.EMI.xp"
 	ZG_HAVE=1
 fi
 # file table: original files, moved CD-DA tracks, new files (src/files.asm)
@@ -65,5 +71,5 @@ for f in $NEWFILES; do ADDS="$ADDS +$f"; done
 python3 "$HERE/tools/makedisc.py" "$IN" "$OUT" \
 	"/SLUS_004.18=$TMP/SLUS_004.18.xp" \
 	"/DATA/FIRST.EMI=$TMP/FIRST.EMI.xp" \
-	"/DATA/FIRSTE.EMI=$TMP/FIRSTE.EMI.xp" $ADDS
+	"/DATA/FIRSTE.EMI=$TMP/FIRSTE.EMI.xp" $SELREPL $ADDS
 echo "done: $OUT"
