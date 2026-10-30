@@ -7,6 +7,8 @@ Branch: `experimental/new-character`. Status: **step 0 done, step 1 done**; find
 - Only the NTSC-U Pocket Fighter (SLUS-00653) is supported.
 - No Arcade and no ending: Zangief is **not selectable in Arcade**, only in Versus.
 - **Option B** (alternate on an existing slot) is fine, provided it covers everything, his own stage background and music included.
+- **Host slot: Dan.** Zangief is Dan (10) plus his own alternate bit. Whatever is not overridden (for example the RESULT row) counts as Dan.
+- **Drop pattern and rates: "Siberian Bear".** 3×2 blocks of the four colours (rows from the top: RRRBBB, RRRBBB, GGGYYY, GGGYYY): big Power Gems come easily, chains are hard. He sends 90 % and receives 90 %: slow but armoured.
 - **Scale 0.65.** The in-match sprites are Pocket Fighter's frames at 65 % (stance about 68×53 px), which keeps his hands inside the middle area.
 
 ## Goal
