@@ -262,3 +262,5 @@ No SPF2T character has a voice on states 1/2. Zangief now gets one, through the 
 - `xp_zstate` skips it (starts one entry later) unless the current script is his idle 0 or pinch 1 (range at list offsets 56–57). So he cries when he gets into trouble or worse, not after every hit or attack. The hit tails for states 1/2 also jump past the cue.
 
 Correction to the voice roles: Dan's script cues use voice-table indices 1–6 = ids 25–30, so slots 1, 2 and 8 are also attack / super voices (states 11, 13, 12, 14), not only "unclear" or "opponent K.O.".
+
+The current voice assignment, slot by slot, is in [ZANGIEF-VOICES.md](ZANGIEF-VOICES.md).
