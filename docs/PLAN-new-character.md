@@ -1,6 +1,6 @@
 # Plan: Zangief from Pocket Fighter as a hidden character
 
-Branch: `experimental/new-character`. Status: **steps 0–6 done; step 7 (Arcade) in progress**; findings in [NEW-CHARACTER-RESEARCH.md](NEW-CHARACTER-RESEARCH.md).
+Branch: `experimental/new-character`. Status: **steps 0–7 done**; findings in [NEW-CHARACTER-RESEARCH.md](NEW-CHARACTER-RESEARCH.md).
 
 ## Decisions (agreed)
 
@@ -132,9 +132,8 @@ Branch: `experimental/new-character`. Status: **steps 0–6 done; step 7 (Arcade
 - His order: Felicia, his rival, is the 8th opponent, before Dan and the bosses.
 - CPU challenger: in another character's run, Zangief comes in place of Dan (the 9th opponent) one time in two.
 - Ending: SPF2T has no character endings. It is a staff roll with the player's character beside the credits, plus wordless vignettes from one of 4 random sets. Zangief gets the same.
-- Still to do:
-  - his figure in the staff roll and the vignettes (now Dan's, with Zangief's colours);
-  - optionally, Zangief in the HARD finale, where the cast gathers under the CAPCOM logo (`HARD_END.EMI`).
+- His staff roll figure is the picture of his Pocket Fighter opening (in a suit, adjusting his glasses), standing on the bottom-right edge of the screen like the others' figures.
+- On HARD he joins the finale, where the cast gathers under the CAPCOM logo: whoever the player is, he appears last, in the back row's middle, and flexes.
 
 ### Step 8: packaging
 

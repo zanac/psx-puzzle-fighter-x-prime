@@ -30,6 +30,8 @@ usage: zangief.py ZANGIEF.PAC PL09A.MDL FIRST.EMI PL9A_OBJ.EMI SLUS_004.18 OUT.E
        [--select PF_SELECT.PAC] [--quotefont PL00_OBJ.EMI,...] [--selmes SELMES.MDL]
        zangief.py voices SE0AA.PAC SE_PL0A.EMI OUT.EMI [--wav DIR]   (SE_PL0B.EMI)
        zangief.py name SELECT.EMI SE0D.PAC OUT.EMI    (his name call on the select screen)
+       zangief.py ending OPEN09.PAC HARD_END.EMI OUT.EMI [--png PREVIEW]
+                  (ZG_END.EMI: his Arcade staff roll figure, see build_end)
 """
 import os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -404,6 +406,134 @@ def build_portraits(selpac, gfx_base):
     blk += b''.join(recs)
     return bytes(blk), bytes(gfx), shows
 
+# --- staff roll figure (step 7) ----------------------------------------------
+# The Arcade staff roll shows the player's character beside the credits: a
+# "child sprite" figure like the select portraits, made from a list in the
+# figure banks that every ENDINGnn.EMI loads at 0x800A1000 (graphics) /
+# 0x800B1000 (records). Dan has a small single frame instead. For Zangief,
+# ZG_END.EMI is loaded over those banks after the ENDING file (the other
+# figures are not needed then); its first entry is a block like the select
+# portrait block, at the start of the graphics:
+#   +0x00  list: u16 count, then (record, palette, x, y) per child
+#   +0x7C  'ZGND' (the code checks it to know the block is in)
+#   +0x80  10 palettes (P1's portrait slots; palette 3 is avoided, the game
+#          rewrites it)
+#   +0x300 44-byte records (offsets relative to the block), then the LZ cells
+# The figure is the one picture of his Pocket Fighter Arcade opening:
+# Zangief in a suit on the airplane, adjusting his glasses
+# (/STAGE/OPEN09.PAC):
+#   type 16: 14 frame records (u16 index, u8 columns, u8 rows, u16 x, u16 y,
+#            u16 cells, u16 flags), then per frame one u16 per cell
+#            (column-major; 0xFFFF = empty; tile = bits 0-10, palette =
+#            bits 11-15)
+#   type 17: palettes; type 267: the tiles, 16x16 4bpp, uncompressed
+# Frame 0 is the scene's frame, frames 1 and 2 the bust in its two poses
+# (240x128, cut at the bottom by the scene's frame: on the staff roll it
+# stands on the bottom edge of the screen).
+PF_OPEN_FRAMES = (1, 2)
+FINALE_FLEXES = 8           # HARD finale: 8 x 14 frames of flexing, then still
+END_MAGIC = b'ZGND'
+END_POS = (-150, -16)       # picture's top-left from the figure's position
+                            # (its right and bottom edges, cut in the source,
+                            # fall on the screen's edges)
+END_PALS = (0, 1, 2, 4, 5, 6, 7, 8, 9)
+
+def pf_open_art(openpac, frame):
+    """-> RGBA picture, {(r,g,b): (palette, index)} of its pixels"""
+    from PIL import Image
+    e = P.pac_entries(openpac)
+    t = e[16]
+    hw = struct.unpack_from('<%dH' % (len(t) // 2), t)
+    idx, cw, ch = struct.unpack_from('<HBB', t, frame * 12)
+    im = Image.new('RGBA', (cw * 16, ch * 16), (0, 0, 0, 0))
+    px = im.load()
+    pal_of = {}
+    for c in range(cw * ch):
+        v = hw[idx + c]
+        if v == 0xFFFF:
+            continue
+        tile, pal = v & 0x7FF, v >> 11
+        cols = struct.unpack_from('<16H', e[17], pal * 32)
+        raw = e[267][tile * 128:tile * 128 + 128]
+        cx, cy = (c // ch) * 16, (c % ch) * 16
+        for y in range(16):
+            for x in range(16):
+                b = raw[y * 8 + x // 2]
+                k = (b >> 4) if x & 1 else (b & 15)
+                if k:
+                    px[cx + x, cy + y] = (pal, k, 0, 255)
+                    pal_of.setdefault(pal, cols)
+    return im, pal_of
+
+def build_end(openpac, template, frame=PF_OPEN_FRAMES[0], preview=None):
+    """-> ZG_END.EMI: entry 0 the block above, entry 1 a stub"""
+    from PIL import Image
+    art, pal_of = pf_open_art(openpac, frame)
+    pals = sorted(pal_of)
+    assert len(pals) <= len(END_PALS), pals
+    slot = {p: END_PALS[i] for i, p in enumerate(pals)}
+    rgb = lambda c: ((c & 31) << 3, (c >> 5 & 31) << 3, (c >> 10 & 31) << 3)
+    W, H = art.size
+    bb = art.getbbox()
+    pieces = []                 # (palette, image) per palette and column band
+    for p in pals:
+        layer = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+        src, dst = art.load(), layer.load()
+        cols = [rgb(c) for c in pal_of[p]]
+        for y in range(H):
+            for x in range(W):
+                v = src[x, y]
+                if v[3] and v[0] == p:
+                    dst[x, y] = cols[v[1]] + (255,)
+        lb = layer.getbbox()
+        if not lb:
+            continue
+        for x0 in range(lb[0], lb[2], 96):      # <= 6 x 8 = 48 cells
+            band = Image.new('RGBA', (W, H), (0, 0, 0, 0))
+            band.alpha_composite(layer.crop((x0, 0, min(x0 + 96, lb[2]), H)), (x0, 0))
+            if band.getbbox():
+                pieces.append((p, band))
+    ox, oy = -END_POS[0], -END_POS[1]
+    n = len(pieces)
+    recs, gfx = [], bytearray()
+    lst = struct.pack('<H', n)
+    for k, (p, band) in enumerate(pieces):
+        cols = [rgb(c) for c in pal_of[p][1:]]
+        # exact colours: index i + 1 for the pixel's own index
+        cache = {}
+        for i, c in enumerate(cols):
+            cache.setdefault(c, i)
+        rec, lz = make_record(band, ox, oy, cols, cache)
+        recs.append((rec, bytes(lz) + bytes(-len(lz) % 4)))
+        lst += struct.pack('<hhhh', k, slot[p], 0, 0)
+    base = 0x300 + 44 * n
+    blk = bytearray(0x300)
+    blk[0:len(lst)] = lst
+    blk[0x7C:0x80] = END_MAGIC
+    for p in pals:
+        o = 0x80 + slot[p] * 32
+        blk[o:o + 32] = struct.pack('<16H', 0, *[c or 0x0421 for c in pal_of[p][1:]])
+    off = base
+    for rec, lz in recs:
+        blk += struct.pack('<I', off) + rec
+        off += len(lz)
+    for rec, lz in recs:
+        blk += lz
+    assert len(blk) <= 0x10000, hex(len(blk))
+    if preview:
+        show = Image.new('RGBA', (W, H), (0, 0, 0, 255))
+        for p, band in pieces:
+            show.alpha_composite(band)
+        show.save(preview)
+    stub = bytes(4)
+    hdr = bytearray(template[:0x800])
+    struct.pack_into('<I', hdr, 0, 2)
+    for i, e in enumerate((blk, stub)):
+        struct.pack_into('<II', hdr, 16 * (i + 1), len(e), 0)
+        hdr[16 * (i + 1) + 8:16 * (i + 1) + 12] = e[:4]
+    out = hdr + blk + bytes(-len(blk) % 0x800) + stub + bytes(-len(stub) % 0x800)
+    return bytes(out), n, len(blk)
+
 # --- WINNER screen (step 5) ---------------------------------------------------
 # The WINNER screen draws, from the winner's own record bank, one of four win
 # quotes (frames 239-242: text strips, two lines of 8x16 monospace text) and a
@@ -624,7 +754,7 @@ def build(pac, mdl, first, template, exe, sheet=None, selpac=None, quote_files=N
     # leaving a hit for idle 0-2 goes through a short hit tail).
     devents = dan_events(exe)
     scripts, where, per_state = bytearray(), {}, {}
-    base = LISTOFF + 4 * (N_STATES + 7)
+    base = LISTOFF + 4 * (N_STATES + 8)
     HITS = ('hit', 'hit2', 'hitloop')
     order = [st for st in range(N_STATES) if STATES[st] in HITS] + [0, 1] + \
             [st for st in range(N_STATES) if STATES[st] not in HITS and st not in (0, 1)]
@@ -662,10 +792,17 @@ def build(pac, mdl, first, template, exe, sheet=None, selpac=None, quote_files=N
         jump = (target - (t0 + 16)) // 16
         assert (target - (t0 + 16)) % 16 == 0
         scripts += struct.pack('<HHhh', 6, 0x8000, index[(42, 0)], jump) + bytes([0, 0, 0, 0, 0, 0, 3, 0])
+    # HARD finale (xp_zhland): his flex for about two seconds, then still
+    finale = base + len(scripts)
+    for k in range(FINALE_FLEXES):
+        for dur, fr in ((6, 337), (8, 338)):
+            scripts += struct.pack('<HHhh', dur, 0, index[(fr, 0)], 0) + bytes([0, 0, 0, 0, 0, 0, 3, 0])
+    scripts += struct.pack('<HHhh', 4095, 0x8000, index[(337, 0)], 0) + bytes([0, 0, 0, 0, 0, 0, 3, 0])
     lst = b''.join(struct.pack('<I', per_state[s]) for s in range(N_STATES))
     lst += b''.join(struct.pack('<I', t) for t in tails)
     lst += struct.pack('<II', base, hit_hi)
     lst += struct.pack('<II', hit_hi, calm_hi)          # idle 0 + pinch 1 scripts
+    lst += struct.pack('<I', finale)                    # entry 58: HARD finale
     # WINNER screen frames, and a valid (empty) record at every index up to 246
     wf, wgfx = winner_frames(template, cols, selpac, len(gfx), quote_files, quotes)
     gfx += wgfx
@@ -829,6 +966,11 @@ if __name__ == '__main__':
     a = sys.argv[1:]
     if a and a[0] == 'voices':
         voices_main(a[1:]); sys.exit(0)
+    if a and a[0] == 'ending':    # zangief.py ending OPEN09.PAC HARD_END.EMI OUT.EMI [--png P]
+        png = a[a.index('--png') + 1] if '--png' in a else None
+        out, n, size = build_end(open(a[1], 'rb').read(), open(a[2], 'rb').read(), preview=png)
+        open(a[3], 'wb').write(out)
+        print('%s: %d pieces, block 0x%X bytes' % (a[3], n, size)); sys.exit(0)
     if a and a[0] == 'name':      # zangief.py name SELECT.EMI SE0D.PAC OUT.EMI
         out = build_select_name(open(a[1], 'rb').read(), open(a[2], 'rb').read())
         open(a[3], 'wb').write(out); sys.exit(0)

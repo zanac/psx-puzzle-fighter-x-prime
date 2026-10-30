@@ -21,6 +21,20 @@ ZG_XAFILE equ 0x59              ; his music (pf_stage.py music)
 ZG_SONG   equ 47                ; song id = XA player entry
 ZG_XA_CHAN equ 6                ; Pocket Fighter's XA00 channel 6
 ZG_XA_LEN equ 3376              ; its sectors
+; step 7: the staff roll figure
+ZG_ENDFILE equ 0x5A                     ; ZG_END.EMI (build.sh)
+END_BLOCK  equ 0x800A1000               ; figure banks of the ENDING files
+END_RECS   equ 0x800B1000
+END_MAGIC  equ 0x444E475A               ; 'ZGND' at +0x7C (build_end)
+ZH_GFX     equ 0x80070000               ; HARD finale: his file, in the
+ZH_REC     equ 0x80082000               ; ENDING leftovers
+ZH_DELAY   equ 260                      ; frames before he appears (the others: 1-240;
+                                        ; + 42 of fade-in, it must end before the
+                                        ; common landing timer, 336)
+ZH_X       equ 184                      ; the back row's middle gap, under the logo
+ZH_Y       equ 80                       ; back row (his frames: feet at 256 - y)
+ZH_FACE    equ 0
+ZH_PRIO    equ 11                       ; behind everyone (lower = in front)
 
 .org 0x80163CDC
 .area 684, 0
@@ -657,6 +671,10 @@ DAN_PLIST equ 0x80189F24        ; Dan's portrait list
 xp_zselload:
 	addiu   sp, sp, -0x18
 	sw      ra, 0x10(sp)
+.if ZG_HAVE
+	la      at, XP_ZEND
+	sb      zero, 0(at)
+.endif
 	jal     0x801043C0
 	nop
 	lui     v0, hi(XP_ZOKN)
@@ -745,6 +763,11 @@ XP_ZPEND:
 ; graphics buffer, t9 = 0 on the select screen (a cache byte is 0xFF), 1 on
 ; the VS screen. Leaf: v0, v1, at, t9.
 xp_zport:
+.if ZG_HAVE
+	j       xp_zportend             ; staff roll first
+	nop
+xp_zport_sel:
+.endif
 	lui     v0, hi(XP_ZOKN)
 	lbu     v0, lo(XP_ZOKN)(v0)   ; select: mode being set up
 	li      at, 3
@@ -1242,6 +1265,14 @@ xp_frame:
 	addiu   t7, t7, -1
 	bnez    t7, @@loop
 	move    t6, t2                  ; second round: MODE_NEXT
+.if ZG_HAVE
+	lbu     t9, -2(t4)              ; XP_ZOK
+	la      t8, XP_ZEND
+	bnez    t9, @@keep
+	nop
+	sb      zero, 0(t8)             ; out of Versus / Arcade: no staff roll
+@@keep:
+.endif
 	j       0x8010436C
 	nop
 
@@ -1370,4 +1401,284 @@ XP_ZOKN:
 	jal     xp_zopp2                ; was jal 0x8012CDBC (delay: sb v0, 0x68(s2))
 .org 0x8012CDB4
 	j       xp_zorder               ; was jr ra
+.endif
+
+; ============================================================================
+; STAFF ROLL FIGURE (step 7)
+; The staff roll (0x801102D8) shows the player's character beside the
+; credits: for most characters a figure script from 0x80189818, a list of
+; child sprites with portrait palettes, in the figure banks every ENDINGnn
+; file loads (0x800A1000 graphics, 0x800B1000 records); Dan gets a small
+; single frame (0x80110364 path). For Zangief, ZG_END.EMI (tools/zangief.py
+; build_end: his Pocket Fighter opening picture) is loaded over those banks
+; right after the ENDING file (ending state 0 / 1 waits for the loader at
+; 0x80143A78), and the figure set-up takes the regular path with a script
+; whose list is Dan's portrait list 20: xp_zlist, xp_zkid and xp_zportpal
+; then use the block at 0x800A1000 (xp_zport, while XP_ZEND is set).
+; Code space: 0x801080BC-0x801082BC, a function with no references that
+; never runs (coverage: boot, menus, Versus, a whole Arcade run with its
+; ending, Street Puzzle, option menus).
+; ============================================================================
+.if ZG_HAVE
+
+.org 0x801080BC
+.area 0x801082BC - 0x801080BC, 0
+
+; v0 = 1 if the human player is Zangief (his side's bit and Dan's slot; the
+; CPU's bit is cleared for any opponent but Dan). Leaf: v0, v1, at.
+xp_zendme:
+	la      at, XP_ZBITS
+	lbu     at, 0(at)
+	lui     v0, 0x801B
+	lbu     v1, -0x1A98(v0)         ; P1 character
+	lbu     v0, -0x17EC(v0)         ; P2 character
+	xori    v1, v1, ZG_CHAR
+	sltiu   v1, v1, 1
+	xori    v0, v0, ZG_CHAR
+	sltiu   v0, v0, 1
+	sll     v0, v0, 1
+	or      v0, v0, v1
+	and     v0, v0, at
+	jr      ra
+	sltu    v0, zero, v0
+
+; ending state 0 / 1, "loader busy?" (0x80143A78, replaces jal 0x80104354):
+; once the ENDING file is in, load ZG_END.EMI over the figure banks when the
+; player is Zangief, and report busy until it is in too.
+xp_zendbusy:
+	addiu   sp, sp, -0x18
+	sw      ra, 0x10(sp)
+	jal     0x80104354
+	nop
+	bnez    v0, @@ret
+	la      t0, XP_ZEPEND
+	lb      t1, 0(t0)
+	nop
+	bnez    t1, @@finish
+	nop
+	jal     xp_zendme
+	nop
+	beqz    v0, @@ret
+	move    v0, zero
+	lui     at, 0x801C
+	lw      t1, -0x7E80(at)         ; keep the load destinations
+	lw      t2, -0x7E7C(at)
+	sw      t1, 4(t0)
+	sw      t2, 8(t0)
+	li      t1, END_BLOCK
+	li      t2, END_RECS
+	sw      t1, -0x7E80(at)
+	sw      t2, -0x7E7C(at)
+	li      t1, 1
+	sb      t1, 0(t0)
+	jal     0x801043C0
+	li      a0, ZG_ENDFILE
+	b       @@ret
+	li      v0, 1
+@@finish:
+	sb      zero, 0(t0)
+	lw      t1, 4(t0)
+	lw      t2, 8(t0)
+	lui     at, 0x801C
+	sw      t1, -0x7E80(at)
+	sw      t2, -0x7E7C(at)
+	move    v0, zero
+@@ret:
+	lw      ra, 0x10(sp)
+	nop
+	jr      ra
+	addiu   sp, sp, 0x18
+
+; xp_zport, staff roll case: while XP_ZEND is set, Zangief's figure block
+; at 0x800A1000 (v0 != 0, v1 = the block, t9 = 0: list at +0, palettes at
+; +0x80).
+xp_zportend:
+	la      v0, XP_ZEND
+	lbu     v0, 0(v0)
+	nop
+	bnez    v0, @@end
+	lui     v1, hi(END_BLOCK)
+	j       xp_zport_sel
+	nop
+@@end:
+	addiu   v1, v1, lo(END_BLOCK)
+	jr      ra
+	move    t9, zero
+
+; staff roll figure set-up, Dan test (0x80110314, was beq v0, v1, 0x80110364;
+; delay slot move a0, zero): v0 = the character, v1 = 10. With Zangief's
+; block in, the regular path, and XP_ZEND set for the portrait hooks.
+xp_zendfig:
+	bne     v0, v1, @@reg
+	lui     at, hi(END_BLOCK + 0x7C)
+	lw      t8, lo(END_BLOCK + 0x7C)(at)
+	li      t9, END_MAGIC
+	bne     t8, t9, @@dan
+	li      t8, 1
+	la      at, XP_ZEND
+	sb      t8, 0(at)
+@@reg:
+	j       0x8011031C
+	nop
+@@dan:
+	j       0x80110364
+	nop
+
+; staff roll figure script (0x801103E8, was jal 0x80123960; s0 = character
+; * 4, a0 = its script): Zangief's own while XP_ZEND is set.
+xp_zendscr:
+	la      at, XP_ZEND
+	lbu     at, 0(at)
+	nop
+	beqz    at, @@go
+	nop
+	la      a0, xp_zendscript
+@@go:
+	j       0x80123960
+	nop
+
+; a1 = state * 4: set that state's script of his file on s0
+xp_zhscript:
+	li      a3, ZH_REC
+	addu    a0, a3, a1
+	lw      a0, ZG_LISTOFF(a0)
+	li      a2, ZH_GFX
+	addu    a0, a0, a3
+	j       0x80123960
+	move    a1, s0
+
+.align 4
+xp_zendscript:                          ; as the others': a figure list (20)
+	.word   0xC0000FFF, 20, 0, 0
+	.word   0xC0000FFF, 20, 0, 0
+XP_ZEPEND:
+	.word   0, 0, 0                 ; state (1 = loading), saved destinations
+XP_ZEND:
+	.byte   0                       ; 1: staff roll figure from the block
+.endarea
+
+; ---- HARD finale ----
+; On HARD, after the staff roll, HARD_END.EMI (over P1's banks) brings the
+; cast in under the CAPCOM logo: 12 objects (type 0x41, index 0-11, spawned
+; by 0x8011F004) that fade in one after the other (delay 0x8016C828, x / y
+; 0x8016C7C8, priority / facing 0x8016C7B0, palette 0x8016C840, scripts
+; 0x8016C7F8 and, on landing, 0x8016C880). Zangief is a 13th: his own file
+; is loaded after HARD_END into the ENDING leftovers (free then), and index
+; 12 gets his idle script, his palette, and the gap in the middle of the
+; back row, under the logo; he comes last, flexes for about two seconds and
+; then stays still.
+; Code space: 0x80156360-0x801564B0, a function with no references that
+; never runs (coverage as above, plus a whole HARD finale).
+.org 0x80156360
+.area 0x801564B0 - 0x80156360, 0
+xp_zhbusy:                              ; 0x80144028, was jal 0x80104354
+	addiu   sp, sp, -0x18
+	sw      ra, 0x10(sp)
+	jal     0x80104354
+	nop
+	bnez    v0, @@ret
+	la      t0, XP_ZEPEND
+	lb      t1, 0(t0)
+	nop
+	bnez    t1, @@finish
+	lui     at, 0x801C
+	lw      t1, -0x7E80(at)         ; keep the load destinations
+	lw      t2, -0x7E7C(at)
+	sw      t1, 4(t0)
+	sw      t2, 8(t0)
+	li      t1, ZH_GFX
+	li      t2, ZH_REC
+	sw      t1, -0x7E80(at)
+	sw      t2, -0x7E7C(at)
+	li      t1, 1
+	sb      t1, 0(t0)
+	jal     0x801043C0
+	li      a0, ZG_FILE
+	b       @@ret
+	li      v0, 1
+@@finish:
+	sb      zero, 0(t0)
+	lw      t1, 4(t0)
+	lw      t2, 8(t0)
+	sw      t1, -0x7E80(at)
+	sw      t2, -0x7E7C(at)
+	move    v0, zero
+@@ret:
+	lw      ra, 0x10(sp)
+	nop
+	jr      ra
+	addiu   sp, sp, 0x18
+
+; object init, after the common part (0x8011ED40, was lbu v0, 7(s0) /
+; lbu a3, 3(s0)); s0 = the object, s1 / ra saved by the host
+xp_zhinit:
+	lbu     v0, 7(s0)
+	lbu     a3, 3(s0)
+	li      at, 12
+	beq     a3, at, @@z
+	nop
+	j       0x8011ED48
+	nop
+@@z:
+	sb      zero, 6(s0)
+	addiu   v0, v0, 1
+	sb      v0, 7(s0)
+	li      v0, ZH_DELAY
+	sh      v0, 0x10(s0)
+	li      v0, ZH_PRIO
+	sb      v0, 9(s0)
+	li      v0, ZH_FACE
+	sb      v0, 0xB(s0)
+	li      v0, ZH_X - 12
+	sh      v0, 0x3E(s0)
+	li      v0, ZH_Y
+	sh      v0, 0x42(s0)
+	li      v0, 2
+	sb      v0, 0x45(s0)
+	sb      a3, 0xD(s0)
+	li      a0, ZH_REC + ZG_PALOFF + 0x80  ; his own colours (set 1)
+	li      a1, 3
+	jal     0x80108C68
+	li      a2, 12
+	li      a1, 0                   ; idle
+	jal     xp_zhscript
+	nop
+	j       0x8011EE10
+	nop
+
+; landing (0x8011EF78, was lb v1, 3(s0) / ori v0, zero, 0xB): index 11
+; keeps its script, 12 (Zangief) takes his finale script, the others the table's
+xp_zhland:
+	lb      v1, 3(s0)
+	li      v0, 12
+	beq     v1, v0, @@z
+	li      v0, 0xB
+	beq     v1, v0, @@keep
+	nop
+	j       0x8011EF88
+	sll     v0, v1, 2
+@@z:
+	jal     xp_zhscript
+	li      a1, 58 * 4              ; finale: flexes ~2 s, then still (zangief.py)
+@@keep:
+	j       0x8011EFB0
+	nop
+.endarea
+
+.org 0x80143A78
+	jal     xp_zendbusy
+.org 0x80110314
+	j       xp_zendfig              ; (delay slot: move a0, zero)
+.org 0x801103E8
+	jal     xp_zendscr              ; (delay slot: ori a3, a3, 0x1000)
+.org 0x80144028
+	jal     xp_zhbusy
+.org 0x8011F048
+	slti    v0, s0, 13              ; 12 + Zangief
+.org 0x8011ED40
+	j       xp_zhinit
+	nop
+.org 0x8011EF78
+	j       xp_zhland
+	nop
 .endif

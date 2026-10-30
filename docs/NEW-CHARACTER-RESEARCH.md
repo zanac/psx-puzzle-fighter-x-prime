@@ -534,9 +534,57 @@ Seen in the emulator with a forced win in every match. The RAM pokes are below; 
   - a scan of the `DATA` files for pointers.
 - **Tests.** `tools/regress.py`:
   - `arcade_ok`: Ryu's Arcade reaches 4 opponents;
-  - `arcade_z_ok`: Zangief's whole run, with Felicia 8th, then Dan and the bosses, up to the staff roll.
+  - `arcade_z_ok`: Zangief's whole run on HARD, with Felicia 8th, then Dan and the bosses;
+  - `staff_z_ok`: his staff roll figure comes from his block;
+  - `hard_z_ok`: he is the 13th object of the HARD finale, drawn from his own file.
 
-### Still to do
+### Staff roll figure
 
-- **Staff roll.** It shows Dan's small figure in Zangief's colours, and the vignettes use Dan as well. A Zangief figure needs the ending sets: a Zangief variant of the `ENDING` files, or patching them after loading.
-- **`HARD_END`.** Zangief on HARD reaches it without problems (tested). It shows the original 12 characters, so Zangief is not among them; adding him would mean extending its sprite set.
+- **How the game draws it.** The staff roll's figure set-up is `0x801102D8`; the character is read from `0x8019FCCD`.
+  - **Dan (10):** a small single frame, record 45 of the figure banks (path `0x80110364`).
+  - **Everyone else:** position (0x100, 0x80) and the portrait palettes (`0x8010773C` / `0x801077E0`). The script comes from `0x80189818[character]`, with the figure banks `0x800A1000` (graphics) and `0x800B1000` (records). The scripts are list mode (`0xC0000FFF`, then the list index: 252 + character) into the portrait list table `0x8018B66C`, so the figure is child sprites, like the select portraits.
+  - **Where the banks come from.** Every `ENDINGnn.EMI` loads these banks as its last set (destinations 30 and 31 of `0x8017174C`), with the figures of every character.
+  - **No animation.** The figure is static (Ryu: no pixel changes over 128 frames).
+- **Zangief's figure.** It is the one picture of his Pocket Fighter Arcade opening: Zangief in a suit on the airplane, adjusting his glasses.
+  - **Source format.** `/STAGE/OPEN09.PAC` holds the picture:
+    - type 16: 14 frame records (u16 index, u8 columns, u8 rows, x, y, cells, flags), then one u16 per cell (column-major; `0xFFFF` = empty; tile = bits 0–10, palette = bits 11–15);
+    - type 17: palettes;
+    - type 267: uncompressed 16×16 4bpp tiles.
+
+    Frame 0 is the scene's frame; frames 1 and 2 are the bust in its two poses, 240×128, cut at the bottom by the scene's frame.
+  - **The file.** `tools/zangief.py build_end` writes `ZG_END.EMI` (file id `0x5A`). Its first entry is a block shaped like the select portrait block:
+    - a list at +0;
+    - `ZGND` at +0x7C;
+    - 10 palettes at +0x80;
+    - records at +0x300, then the LZ cells.
+
+    The bust is split by its own Pocket Fighter palettes (exact colours, palette 3 avoided) into 7 pieces of at most 6×8 cells.
+  - **Loading.** `xp_zendbusy` replaces the loader wait of ending state 0/1 (`0x80143A78`). Once the ENDING file is in and the human player is Zangief, it loads `ZG_END.EMI` over the figure banks; the other figures are not needed then.
+  - **Set-up.** `xp_zendfig` (at `0x80110314`) sends him down the regular path and sets `XP_ZEND`. `xp_zendscr` (at `0x801103E8`) gives him a list-mode script with Dan's portrait list (20). The existing portrait hooks (`xp_zlist`, `xp_zkid`, `xp_zportpal` through `xp_zport`) then take the block at `0x800A1000` while `XP_ZEND` is set. `XP_ZEND` is cleared on the select screen and whenever the mode is neither Versus nor Arcade.
+  - **Placement.** `END_POS`: the bust stands on the bottom edge and touches the right edge (the visible area ends at x ≈ 330, as for Ryu), so its cut sides are hidden.
+
+### HARD finale
+
+- **How the game builds it.** On HARD, after the staff roll, ending state 10 loads `HARD_END.EMI` over P1's banks.
+  - **Spawning.** `0x8011F004` spawns 12 objects of type `0x41`, index 0–11.
+  - **Init and tables.** The init is `0x8011ED04`. Per index it reads:
+    - a delay before appearing, `0x8016C828`;
+    - a draw priority and a facing, `0x8016C7B0` (lower priority = drawn in front);
+    - x / y, `0x8016C7C8`;
+    - a palette, `0x8016C840`, copied to bank 3 by `0x80108C68`;
+    - a script, `0x8016C7F8`, with banks P1 hard-coded.
+  - **Appearing.** The characters do not move. Each fades in (`0x80106D28`: palette brightness by bit mask) once its delay is over.
+  - **Landing.** A common timer (`+0x1C` = 336 frames from spawning) triggers the landing script (`0x8016C880`; index 11 keeps its own).
+  - **One-credit bonus.** Finishing on one credit adds a scrolling message ("YOU COMPLETED THE MASTER ARCADE MODE USING ONLY ONE CREDIT! YOU ARE THE SUPREME MASTER PUZZLE FIGHTER!", `0x80171618`, `0x80144484`).
+- **Zangief as the 13th.** He is part of the cast now, so he appears whoever the player is.
+  - **His file.** `xp_zhbusy` replaces the wait at `0x80144028`. After `HARD_END.EMI`, it loads his own `PL0B_OBJ.EMI` into what the ENDING file left in RAM, which nothing uses then (graphics `0x80070000`, records `0x80082000`).
+  - **Spawning and init.** The spawner makes 13 objects. `xp_zhinit` (at `0x8011ED40`) gives index 12:
+    - his idle script and his own colours (palette set 1, into bank 3 slot 12);
+    - the back row's middle gap, under the logo (x 184);
+    - priority 11 (behind everyone, as the back row's big man);
+    - a delay of 260 frames: last, but his 42-frame fade-in must end before the 336-frame landing timer, or he never lands and stays half faded.
+  - **Landing.** `xp_zhland` (at `0x8011EF78`) gives him his finale script when he lands (`zangief.py`: entry 58 of his script list). He flexes for about two seconds (8 × 14 frames), then holds still with his arms up.
+  - **Coordinates.** His frames are in-match frames: the y of his feet on screen is about 256 − y, not y + 144 as for the `HARD_END` frames.
+- **Code space.**
+  - `0x801080BC`–`0x801082BC` and `0x80156360`–`0x801564B0`: functions with no references that never run. This was checked by coverage over the earlier runs plus a whole staff roll and HARD finale on the original disc.
+  - The existing `0x8010868C` / `0x80153AF4` areas also stay unused there.

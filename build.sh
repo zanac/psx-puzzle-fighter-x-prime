@@ -59,7 +59,12 @@ if [ -n "${XP_PF:-}" ]; then
 	python3 "$HERE/tools/extract.py" "$IN" /DATA/STAGE03.EMI "$TMP/STAGE03.EMI"
 	python3 "$HERE/tools/pf_stage.py" "$TMP/ST06.PAC" "$TMP/STAGE03.EMI" "$TMP/ZG_STAGE.EMI"
 	python3 "$HERE/tools/pf_stage.py" music "$XP_PF" "$TMP/ZG_MUSIC.XA"
-	NEWFILES="PL0B_OBJ.EMI=$TMP/PL0B_OBJ.EMI SE_PL0B.EMI=$TMP/SE_PL0B.EMI ZG_STAGE.EMI=$TMP/ZG_STAGE.EMI ZG_MUSIC.XA=$TMP/ZG_MUSIC.XA $NEWFILES"
+	# his Arcade staff roll figure: the picture of his Pocket Fighter opening
+	# (new file id 0x5A)
+	python3 "$HERE/tools/extract.py" "$XP_PF" /STAGE/OPEN09.PAC "$TMP/OPEN09.PAC"
+	python3 "$HERE/tools/extract.py" "$IN" /DATA/HARD_END.EMI "$TMP/HARD_END.EMI"
+	python3 "$HERE/tools/zangief.py" ending "$TMP/OPEN09.PAC" "$TMP/HARD_END.EMI" "$TMP/ZG_END.EMI"
+	NEWFILES="PL0B_OBJ.EMI=$TMP/PL0B_OBJ.EMI SE_PL0B.EMI=$TMP/SE_PL0B.EMI ZG_STAGE.EMI=$TMP/ZG_STAGE.EMI ZG_MUSIC.XA=$TMP/ZG_MUSIC.XA ZG_END.EMI=$TMP/ZG_END.EMI $NEWFILES"
 	# his name call on the select screen (SELECT.EMI's sound bank)
 	python3 "$HERE/tools/extract.py" "$XP_PF" /SE/SE0D.PAC "$TMP/SE0D.PAC"
 	python3 "$HERE/tools/extract.py" "$IN" /DATA/SELECT.EMI "$TMP/SELECT.EMI"

@@ -3,8 +3,10 @@ from nav import *
 from model import xprime
 """End-to-end regression: title, select (secret cycle), damage fuzz against
 model.py, match end + RESULT, Arcade with Devilot (P1 wins every match: it
-must reach 4 different opponents, arcade_ok), Arcade as Zangief (Felicia
-8th, then Dan and the bosses: arcade_z_ok, needs XP_PF), Street Puzzle, demo.
+must reach 4 different opponents, arcade_ok), Arcade as Zangief on HARD
+(Felicia 8th, then Dan and the bosses: arcade_z_ok; his staff roll figure:
+staff_z_ok; he joins the HARD finale: hard_z_ok; all need XP_PF), Street
+Puzzle, demo.
 
 usage: regress.py IMAGE.(pbp|cue) OUTDIR
 Writes screenshots, savestates and result.json into OUTDIR."""
@@ -78,7 +80,8 @@ R['arcade_ok']=len(opp)>=4
 # With Zangief's assets (XP_PF) Felicia must be his 8th opponent, before
 # Dan (10) and the bosses; the run must reach the ending (staff roll).
 e.load_state(P_('st_menu.state'))
-e.press(lr.CROSS,6,200); e.press(lr.CROSS,6,200)
+e.press(lr.CROSS,6,200); e.press(lr.RIGHT,4,30); e.press(lr.CROSS,6,200)   # level HARD
+R['arcade_z_level']=e.r8(0x801baacf)
 for i in range(7): e.press(lr.DOWN,4,20)
 R['arcade_z_sel']=e.r8(0x801baac4)
 e.press(lr.CROSS,6,30)
@@ -94,6 +97,26 @@ for k in range(260):
 sh('arcade_zangief')
 R['arcade_z_opponents']=opp
 R['arcade_z_ok']=zp1 and len(opp)>=10 and opp[7]==6 and opp[8]==10
+# then his ending: the staff roll figure from his block (children with
+# graphics at 0x800A1000, records at +0x300), and on HARD the finale's 13th
+# object (index 12) drawn from his own file (graphics 0x80070000)
+staff=fin=False
+for k in range(240):
+    for f in range(60): e.w16(0x801ae500+0x22a,250); e.run(1)
+    if k%4==0: e.press(lr.CROSS,4,4)
+    for i in range(33):
+        a=0x801b5c64+i*0x1c
+        if e.r8(a) and e.r32(a+0x10)==0x800a1000 and e.r32(a+0x14)==0x800a1300:
+            if not staff: sh('staff_zangief')
+            staff=True
+    for i in range(20):
+        a=0x801be068+i*0x70
+        if e.r8(a) and e.r8(a+2)==0x41 and e.r8(a+3)==12 and e.r32(a+0x4c)==0x80070000:
+            if not fin:
+                e.run(240); sh('hard_finale')
+            fin=True
+    if fin: break
+R['staff_z_ok']=staff; R['hard_z_ok']=fin
 # street puzzle
 e.load_state(P_('st_menu.state'))
 e.press(lr.DOWN,8,30); e.press(lr.CROSS,6,250); e.press(lr.CROSS,6,400); e.run(300); sh('street')
