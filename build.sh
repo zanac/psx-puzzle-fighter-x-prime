@@ -36,8 +36,10 @@ if [ -n "${XP_PF:-}" ]; then
 	python3 "$HERE/tools/extract.py" "$XP_PF" /MDL/PL09A.MDL "$TMP/PL09A.MDL"
 	python3 "$HERE/tools/extract.py" "$IN" /DATA/FIRST.EMI "$TMP/FIRST.EMI"
 	python3 "$HERE/tools/extract.py" "$IN" /DATA/PL9A_OBJ.EMI "$TMP/PL9A_OBJ.EMI"
+	python3 "$HERE/tools/extract.py" "$XP_PF" /STAGE/SELECT.PAC "$TMP/PF_SELECT.PAC"
 	python3 "$HERE/tools/zangief.py" "$TMP/ZANGIEF.PAC" "$TMP/PL09A.MDL" \
-		"$TMP/FIRST.EMI" "$TMP/PL9A_OBJ.EMI" "$TMP/SLUS_004.18" "$TMP/PL0B_OBJ.EMI"
+		"$TMP/FIRST.EMI" "$TMP/PL9A_OBJ.EMI" "$TMP/SLUS_004.18" "$TMP/PL0B_OBJ.EMI" \
+		--select "$TMP/PF_SELECT.PAC"
 	# his voices (second new file: id 0x57)
 	python3 "$HERE/tools/extract.py" "$XP_PF" /SE/SE0AA.PAC "$TMP/SE0AA.PAC"
 	python3 "$HERE/tools/extract.py" "$IN" /DATA/SE_PL0A.EMI "$TMP/SE_PL0A.EMI"

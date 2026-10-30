@@ -172,7 +172,14 @@ xp_labelkey2:
 	lui     t1, hi(MODE_NEXT)
 	lbu     t1, lo(MODE_NEXT)(t1)
 	li      t2, 3
+	beq     t1, t2, @@vs            ; select screen
+	nop
+	bnez    t1, @@ret
+	lui     t1, hi(MODE)            ; VS screen: MODE_NEXT is 0, MODE 3
+	lbu     t1, lo(MODE)(t1)
+	nop
 	bne     t1, t2, @@ret
+@@vs:
 	lui     t1, hi(XP_ZBITS)
 	lbu     t1, lo(XP_ZBITS)(t1)
 	nop
@@ -328,9 +335,9 @@ xp_zstate:
 	nop
 	and     at, at, v1
 	beqz    at, @@ret
-	addiu   v1, a1, -23 * 4         ; 23/24: select-screen poses stay Dan's
+	addiu   v1, a1, -23 * 4         ; 23/24: select-screen poses, xp_zselst
 	sltiu   v1, v1, 8
-	bnez    v1, @@ret
+	bnez    v1, @@select
 	li      v1, BANK_P1
 	beqz    t8, @@bank
 	nop
@@ -374,6 +381,9 @@ xp_zstate:
 	addiu   s0, s0, 16
 @@ret:
 	jr      ra
+	nop
+@@select:
+	j       xp_zselst
 	nop
 
 .endarea
@@ -530,6 +540,352 @@ xp_zpal3:
 	nop
 .endarea
 
+; ============================================================================
+; Select / VS portrait (step 5)
+; The big portraits are "child" sprites made from a per-character list
+; (table 0x8018B66C; Dan's is list 20 at 0x80189F24) by 0x80123BAC, with 10
+; palettes copied per side by 0x8010773C. Both screens use the same list.
+; Zangief's lists, palettes and frames are in his own file (tools/zangief.py
+; portrait block, at the start of the graphics entry). On the select screen
+; his file is not loaded for the match
+; yet, so in Versus it is loaded into the other player's banks right after
+; SELECT.EMI (those banks are free there; the "loaded file" cache byte says
+; so, and the match load then skips or redoes it as usual).
+; Code space: 0x80152C14 (332 bytes) and 0x8015515C (588 bytes), functions
+; with no references that never run (coverage: boot, menus, Versus select,
+; VS, match).
+; ============================================================================
+CACHE_P1  equ 0x801BF115        ; "loaded file" cache bytes (P2 at +1)
+DAN_PLIST equ 0x80189F24        ; Dan's portrait list
+
+.org 0x80152C14
+.area 0x14C, 0
+
+; select screen loader (0x8012BF7C): SELECT.EMI (a0 = 0x39), then in Versus
+; Zangief's file is queued for the banks SELECT.EMI did not take (cache byte
+; 0xFF marks the side SELECT.EMI went to). Loads are asynchronous: the select
+; scene waits for the loader (0x80128768), see xp_zselbusy.
+xp_zselload:
+	addiu   sp, sp, -0x18
+	sw      ra, 0x10(sp)
+	jal     0x801043C0
+	nop
+	lui     v0, hi(MODE_NEXT)
+	lbu     v0, lo(MODE_NEXT)(v0)
+	li      at, 3
+	bne     v0, at, @@done
+	lui     at, hi(CACHE_P1)
+	lb      v0, lo(CACHE_P1)(at)
+	li      at, -1
+	beq     v0, at, @@side
+	li      v1, 2                   ; SELECT.EMI in P1's banks: use P2's
+	li      v1, 1
+@@side:
+	la      at, XP_ZPEND
+	sb      v1, 0(at)               ; 1 + player
+@@done:
+	lw      ra, 0x10(sp)
+	nop
+	jr      ra
+	addiu   sp, sp, 0x18
+
+; select scene "loader busy?" (0x80128768, replaces jal 0x80104354): once
+; SELECT.EMI is in, start Zangief's load and report busy until it is done;
+; then put the load destinations back.
+xp_zselbusy:
+	addiu   sp, sp, -0x18
+	sw      ra, 0x10(sp)
+	jal     0x80104354
+	nop
+	bnez    v0, @@ret
+	la      t0, XP_ZPEND
+	lb      a0, 0(t0)
+	nop
+	beqz    a0, @@ret               ; nothing queued (v0 = 0)
+	li      at, 3
+	beq     a0, at, @@finish
+	addiu   a0, a0, -1              ; player
+	sll     v0, a0, 3
+	la      at, 0x80169E44          ; per player: graphics, record bank
+	addu    at, at, v0
+	lw      v0, 0(at)
+	lw      v1, 4(at)
+	lui     at, 0x801C
+	lw      t1, -0x7E80(at)         ; keep the current destinations
+	lw      t2, -0x7E7C(at)
+	sw      t1, 4(t0)
+	sw      t2, 8(t0)
+	sw      v0, -0x7E80(at)         ; load destinations (as 0x8010BA90)
+	sw      v1, -0x7E7C(at)
+	la      at, CACHE_P1
+	addu    at, at, a0
+	li      v0, ZG_GROUP
+	sb      v0, 0(at)
+	li      v0, 3
+	sb      v0, 0(t0)               ; in progress
+	jal     0x801043C0
+	li      a0, ZG_FILE
+	b       @@ret
+	li      v0, 1
+@@finish:
+	sb      zero, 0(t0)
+	lw      t1, 4(t0)
+	lw      t2, 8(t0)
+	lui     at, 0x801C
+	sw      t1, -0x7E80(at)
+	sw      t2, -0x7E7C(at)
+	move    v0, zero
+@@ret:
+	lw      ra, 0x10(sp)
+	nop
+	jr      ra
+	addiu   sp, sp, 0x18
+
+.align 4
+XP_ZPEND:
+	.word   0, 0, 0                 ; state (0 idle, 1/2 queued for P1/P2, 3 loading), saved destinations
+.endarea
+
+.org 0x8015515C
+.area 0x24C, 0
+
+; xp_zport: is side t8 (0 P1, 1 P2) showing Zangief's portrait, and where is
+; his file? (Versus only: MODE_NEXT = 3 on the select screen, MODE = 3 with
+; MODE_NEXT = 0 on the VS screen.) Out: v0 = record bank holding it (0 = no:
+; keep Dan's), v1 = its
+; graphics buffer, t9 = 0 on the select screen (a cache byte is 0xFF), 1 on
+; the VS screen. Leaf: v0, v1, at, t9.
+xp_zport:
+	lui     v0, hi(MODE_NEXT)
+	lbu     v0, lo(MODE_NEXT)(v0)   ; select: mode being set up
+	li      at, 3
+	beq     v0, at, @@vs
+	nop
+	bnez    v0, @@no
+	lui     v0, hi(MODE)            ; VS screen: MODE_NEXT is 0 again
+	lbu     v0, lo(MODE)(v0)
+	nop
+	bne     v0, at, @@no
+@@vs:
+	lui     v0, hi(XP_ZBITS)
+	lbu     v0, lo(XP_ZBITS)(v0)
+	nop
+	srlv    v0, v0, t8
+	andi    v0, v0, 1
+	beqz    v0, @@no
+	lui     at, hi(CACHE_P1)
+	lb      v0, lo(CACHE_P1)(at)
+	lb      v1, lo(CACHE_P1 + 1)(at)
+	li      t9, 0
+	li      at, -1
+	beq     v0, at, @@scr
+	nop
+	beq     v1, at, @@scr
+	nop
+	li      t9, 1
+@@scr:
+	beqz    t8, @@p1
+	li      at, ZG_GROUP
+	beq     v1, at, @@bank2         ; P2: own banks first
+	nop
+	beq     v0, at, @@bank1
+	nop
+	b       @@no
+	nop
+@@p1:
+	beq     v0, at, @@bank1
+	nop
+	beq     v1, at, @@bank2
+	nop
+@@no:
+	jr      ra
+	move    v0, zero
+@@bank1:
+	li      v0, BANK_P1
+	li      v1, 0x80024000
+	jr      ra
+	nop
+@@bank2:
+	li      v0, BANK_P2
+	li      v1, 0x8006C000
+	jr      ra
+	nop
+
+; portrait list (0x80123BF0, delay slot: s0 = the list): Dan's list on a
+; Zangief side -> his own list (select or VS) and XP_ZK set for xp_zkid.
+; s1 = the parent object (+0xB = side). Uses v0, v1, at, t7-t9.
+xp_zlist:
+	move    t7, ra
+	li      s2, 1                   ; vanilla (replaced)
+	la      at, XP_ZK
+	sw      zero, 0(at)
+	li      at, DAN_PLIST
+	bne     s0, at, @@ret
+	nop
+	lbu     t8, 0xB(s1)
+	jal     xp_zport
+	nop
+	beqz    v0, @@ret
+	nop
+	move    v0, v1                  ; block: start of his graphics entry
+	la      at, XP_ZK
+	sw      v0, 0(at)
+	sw      v1, 4(at)
+	sll     t9, t9, 6               ; VS list at +0x40
+	addu    s0, v0, t9
+@@ret:
+	jr      t7
+	nop
+
+; child sprite banks (0x80123C34): a0 = the child, s1 = the parent.
+xp_zkid:
+	la      at, XP_ZK
+	lw      v0, 0(at)
+	nop
+	beqz    v0, @@van
+	nop
+	lw      v1, 4(at)
+	addiu   v0, v0, 0x300           ; Zangief's portrait records
+	sw      v1, 0x10(a0)
+	jr      ra
+	sw      v0, 0x14(a0)
+@@van:
+	lw      v0, 0x4C(s1)
+	nop
+	sw      v0, 0x10(a0)
+	lw      v0, 0x50(s1)
+	jr      ra
+	sw      v0, 0x14(a0)
+
+; portrait palettes (0x8010773C entry): a0 = side, a1 = character, a2 =
+; screen row. Zangief: his 10 palettes to the same two places as vanilla.
+xp_zportpal:
+	andi    t8, a0, 0xFF
+	andi    v0, a1, 0xFF
+	li      at, ZG_CHAR
+	bne     v0, at, @@van
+	move    t7, ra
+	jal     xp_zport
+	nop
+	beqz    v0, @@van
+	move    ra, t7
+	addiu   v0, v1, 0x80
+	beqz    t9, @@row
+	nop
+	addiu   v0, v0, 0x140           ; VS palettes
+@@row:
+	move    t9, v0
+	li      v1, 0x60                ; P1: palettes 0x30.. (bytes / 2 * 2)
+	beqz    t8, @@copy
+	nop
+	li      v1, 0x1A0               ; P2: 0xD0..
+@@copy:
+	move    t8, v1
+	move    a0, t9
+	la      a1, 0x801A162C
+	addu    a1, a1, t8
+	jal     0x8012100C
+	li      a2, 0x50
+	move    a0, t9
+	la      a1, 0x801A2A2C
+	addu    a1, a1, t8
+	jal     0x8012100C
+	li      a2, 0x50
+	jr      t7
+	nop
+@@van:
+	addiu   sp, sp, -0x20
+	j       0x80107744
+	sw      s1, 0x14(sp)
+
+.align 4
+XP_ZK:
+	.word   0, 0                    ; portrait block, graphics (0 = Dan's)
+.endarea
+
+; ---- select-screen chibi: Zangief's own sprites ----
+; The chibis are drawn from SELECT.EMI's banks (0x80136400 picks them, then
+; 0x80123960 sets the object up). For Zangief, states 23/24 (choosing /
+; chosen) come from his file, loaded in the other banks (xp_zselload), and
+; the colour from his palette block. Code space: 0x8013BBB4 (308 bytes, a
+; function with no references that never runs, same coverage).
+.org 0x8013BBB4
+.area 0x134, 0
+
+; from xp_zstate (state 23/24, Zangief side t8, a1 = state * 4, s1 = the
+; object): only for the select-state start (0x80136430, return 0x80136438).
+xp_zselst:
+	li      at, 0x80136438
+	bne     ra, at, @@ret
+	move    t7, ra
+	jal     xp_zport
+	nop
+	beqz    v0, @@ret
+	move    ra, t7
+	addu    t9, v0, a1
+	lw      t9, ZG_LISTOFF(t9)
+	nop
+	addu    s0, v0, t9              ; his script
+	la      at, XP_ZSEL
+	sw      v1, 0(at)               ; graphics
+	sw      v0, 4(at)               ; record bank
+@@ret:
+	jr      ra
+	nop
+
+; object setup (0x8013648C, replaces jal 0x80123960): a2/a3 = his banks
+xp_zselbank:
+	la      at, XP_ZSEL
+	lw      v0, 4(at)
+	nop
+	beqz    v0, @@go
+	nop
+	lw      a2, 0(at)
+	move    a3, v0
+	sw      zero, 4(at)
+@@go:
+	j       0x80123960
+	nop
+
+; select chibi palette (0x8010789C entry): a0 = side, a1 = character, a2 =
+; colour set; palette 0 of the set to bank 3, slot 5 (P1) / 12 (P2).
+xp_zchibipal:
+	andi    t8, a0, 0xFF
+	andi    v0, a1, 0xFF
+	li      at, ZG_CHAR
+	bne     v0, at, @@van
+	move    t7, ra
+	jal     xp_zport
+	nop
+	beqz    v0, @@van
+	move    ra, t7
+	li      a3, 5
+	beqz    t8, @@p1
+	nop
+	li      a3, 12
+@@p1:
+	andi    a2, a2, 0xFF
+	li      at, xp_mv_ret           ; called by the cursor move (xprime.asm):
+	bne     ra, at, @@set           ; not chosen yet, show his own colours
+	nop
+	li      a2, 1                   ; (set 1 = original, see tools/zangief.py)
+@@set:
+	sll     a2, a2, 7
+	addu    a0, v0, a2
+	addiu   a0, a0, ZG_PALOFF
+	li      a1, 3
+	j       0x80108C68
+	move    a2, a3
+@@van:
+	addiu   sp, sp, -0x18
+	j       0x801078A4
+	sw      ra, 0x10(sp)
+
+.align 4
+XP_ZSEL:
+	.word   0, 0                    ; graphics, record bank (0 = none pending)
+.endarea
+
 ; hooks only when the build has Zangief's file (XP_PF in build.sh);
 ; otherwise he keeps Dan's in-match look
 .if ZG_HAVE
@@ -567,6 +923,28 @@ xp_zpal3:
 	jal     xp_zpal3
 .org 0x80136A00
 	jal     xp_zpal3
+.org 0x8012BF7C
+	jal     xp_zselload             ; (delay slot: a0 = 0x39, SELECT.EMI)
+.org 0x80128768
+	jal     xp_zselbusy
+.org 0x80123BF0
+	jal     xp_zlist
+	lw      s0, 0(at)
+.org 0x80123C34
+	jal     xp_zkid
+	nop
+	nop
+	nop
+	sw      s4, 0x18(a0)
+	nop
+.org 0x8010773C
+	j       xp_zportpal
+	nop
+.org 0x8013648C
+	jal     xp_zselbank
+.org 0x8010789C
+	j       xp_zchibipal
+	nop
 .org 0x8016EFFA                         ; Dan's voice table, unused indices 7/8
 	.byte   14, 15                  ; Zangief's "in trouble" cries (ZG_EVENTS)
 .endif

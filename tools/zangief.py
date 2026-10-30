@@ -113,7 +113,7 @@ STATES = {
     9: 'hit', 25: 'hitloop', 26: 'hit', 27: 'hit', 28: 'hit2', 29: 'flex',
     35: 'hitloop',
     10: 'punch', 11: 'lariat', 12: 'pile', 13: 'pile', 14: 'bear',
-    23: 'idle', 24: 'idle',
+    23: 'idle', 24: 'flex',
 }
 
 # --- frames ------------------------------------------------------------------
@@ -312,7 +312,97 @@ def place(ents, loop, events):
         sig.append((j, f1, v))
     return ents, loop, tuple(sig)
 
-def build(pac, mdl, first, template, exe, sheet=None):
+# --- select / VS portrait (step 5) ---------------------------------------------
+# Pocket Fighter's select art (/STAGE/SELECT.PAC frame 554: Zangief, fists
+# crossed; palettes from 586, one per cell palette offset). SPF2T draws a
+# portrait as up to 10 "child" sprites listed per character (table
+# 0x8018B66C, see xp_zlist): Zangief's are 4 quadrants of a 128x112 box
+# around the parent (like Dan's frames 143-146), each with its own 15-colour
+# palette. Two versions: a close-up for the select screen, the whole art for
+# the VS screen. The block is at the start of the graphics entry (the record
+# bank is full); record graphics offsets are relative to that entry too:
+#   +0x000 select list, +0x040 VS list (u16 count, then frame, palette, x, y)
+#   +0x080 select palettes, +0x1C0 VS palettes (10 x 16 colours each, the
+#          size of the game's per-character portrait palette copy)
+#   +0x300 records (select 0-3, VS 4-7), graphics offsets after the frames
+PORT_SIZE = 0x300 + 8 * 44
+PF_SEL_FRAME, PF_SEL_PAL = 554, 586
+# source rectangle (PF pixels, art mirrored to face right), scale, and where
+# it goes in the 128x112 box (the select screen shows about x 13-127, y
+# 10-80 of it: the screen edge and the Counter Gem panel cover the rest)
+PORTRAITS = (((22, 0, 231, 127), 0.55, (13, 10)),      # select: face and fists
+             ((7, 6, 245, 213), 0.5, (4, 4)))          # VS: the whole art
+
+def quantise_fine(im):
+    """15 colours, k-means refined (portraits: many shades per quadrant)"""
+    from PIL import Image
+    px = [p[:3] for p in im.getdata() if p[3]]
+    strip = Image.new('RGB', (len(px), 1))
+    strip.putdata(px)
+    q = strip.quantize(colors=15, method=Image.Quantize.MAXCOVERAGE, kmeans=3)
+    pal = q.getpalette()[:45]
+    cols = [tuple(pal[i:i + 3]) for i in range(0, 45, 3)]
+    while len(cols) < 15:
+        cols.append((0, 0, 0))
+    return cols
+
+def pf_select_art(selpac):
+    from PIL import Image
+    e0 = P.pac_entries(selpac)
+    e = {0: e0[11], 1: e0[10], 2: e0[12]}
+    tbl = e[1]
+    words = struct.unpack_from('<%dI' % (len(tbl) // 4), tbl)
+    rec = struct.unpack_from('<HBBHHHH', tbl, PF_SEL_FRAME * 12)
+    img = P.render(e, words, rec)
+    cols = P.palette(e, PF_SEL_PAL, 32)
+    im = Image.new('RGBA', (len(img[0]), len(img)))
+    im.putdata([(*cols[v], 255) if v else (0, 0, 0, 0) for row in img for v in row])
+    return im.transpose(Image.FLIP_LEFT_RIGHT)
+
+def build_portraits(selpac, gfx_base):
+    """-> (block bytes, graphics bytes, preview images)"""
+    from PIL import Image
+    art = pf_select_art(selpac)
+    lists, pals, recs, gfx, shows = [], [], [], bytearray(), []
+    for (x0, y0, x1, y1), s, (dx, dy) in PORTRAITS:
+        crop = art.crop((x0, y0, x1, y1))
+        crop = crop.resize((round(crop.width * s), round(crop.height * s)), Image.LANCZOS)
+        a = crop.split()[3].point(lambda v: 255 if v > 128 else 0)
+        crop.putalpha(a)
+        crop = crop.crop((0, 0, min(crop.width, 128 - dx), min(crop.height, 112 - dy)))
+        box = Image.new('RGBA', (128, 112), (0, 0, 0, 0))
+        box.alpha_composite(crop, (dx, dy))
+        if os.environ.get('XP_PORT_FRAME'):     # debug: show the 128x112 box
+            from PIL import ImageDraw
+            ImageDraw.Draw(box).rectangle((0, 0, 127, 111), outline=(255, 0, 0, 255))
+            for k in range(0, 112, 16):
+                ImageDraw.Draw(box).line((0, k, 6, k), fill=(0, 255, 0, 255))
+        shows.append(box)
+        lst = struct.pack('<H', 4)
+        prow = bytearray()
+        for q in range(4):
+            qx, qy = (q & 1) * 64, (q >> 1) * 56
+            part = Image.new('RGBA', (128, 112), (0, 0, 0, 0))
+            part.alpha_composite(box.crop((qx, qy, qx + 64, qy + 56)), (qx, qy))
+            cols = quantise_fine(part)
+            rec, lz = make_record(part, 64, 56, cols, {})
+            recs.append(struct.pack('<I', gfx_base + len(gfx)) + rec)
+            gfx += lz + bytes(-len(lz) % 4)
+            pi = (0, 1, 2, 4)[q]        # palette 3 of a side is rewritten by the game
+            prow += bytes(pi * 32 - len(prow))
+            prow += struct.pack('<16H', 0, *[bgr555(c) for c in cols])
+            lst += struct.pack('<hhhh', len(recs) - 1, pi, 0, 0)
+        lists.append(lst)
+        pals.append(bytes(prow) + bytes(0x140 - len(prow)))
+    blk = bytearray(0x300)
+    blk[0:len(lists[0])] = lists[0]
+    blk[0x40:0x40 + len(lists[1])] = lists[1]
+    blk[0x80:0x1C0] = pals[0]
+    blk[0x1C0:0x300] = pals[1]
+    blk += b''.join(recs)
+    return bytes(blk), bytes(gfx), shows
+
+def build(pac, mdl, first, template, exe, sheet=None, selpac=None):
     pf = PFFrames(pac)
     anims = build_anims(mdl)
     used = {name: anims[name] for name in set(STATES.values())}
@@ -321,6 +411,10 @@ def build(pac, mdl, first, template, exe, sheet=None):
     cols = quantise([c[0] for c in comps.values()])
     cache = {}
     index, recs, gfx = {}, [], bytearray()
+    if selpac:                      # portrait block first (graphics entry +0)
+        blk, pgfx, _ = build_portraits(selpac, PORT_SIZE)
+        assert len(blk) == PORT_SIZE
+        gfx += blk + pgfx
     for k in keys:
         img, ox, oy = comps[k]
         rec, lz = make_record(img, ox, oy, cols, cache)
@@ -512,6 +606,7 @@ if __name__ == '__main__':
         print(__doc__); sys.exit(1)
     sheet = a[a.index('--sheet') + 1] if '--sheet' in a else None
     rd = lambda p: open(p, 'rb').read()
-    out, n, g, e1 = build(rd(a[0]), rd(a[1]), rd(a[2]), rd(a[3]), rd(a[4]), sheet)
+    selpac = rd(a[a.index('--select') + 1]) if '--select' in a else None
+    out, n, g, e1 = build(rd(a[0]), rd(a[1]), rd(a[2]), rd(a[3]), rd(a[4]), sheet, selpac)
     open(a[5], 'wb').write(out)
     print('%d frames, graphics 0x%X bytes, bank 0x%X bytes' % (n, g, e1))
