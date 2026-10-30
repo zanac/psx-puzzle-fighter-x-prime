@@ -179,3 +179,11 @@ Zangief is Dan (10) plus a per-player bit in `XP_ZBITS` (bit 0 P1, bit 1 P2), se
 - The scripts live in the EXE; the frame indices point into the character file's records (Dan uses records 199–251 of `PL9A`, after Akuma's).
 
 So Zangief can keep Dan's state machine and attack code, with his own list of scripts and his own frame bank. Effects that Dan's attacks spawn (Gadoken) must be suppressed or replaced for him.
+
+## Pocket Fighter animation data
+
+- The character object (Zangief as P1 in a training match: `0x801E1DA8`) holds the current frame at +0x46, the current animation entry at +0x1C and the base of the character's animation array at +0x48. The array comes from the character's `MDL` overlay (Zangief: `0x8016265C`, 1023 entries).
+- **Entry**, 24 bytes: `u16 duration, s16 flags, s16 jump, u16 frame, ...`. A negative flag ends the animation and jumps to entry `jump` (a loop or the next state). Step: `0x801A6EB0`; set entry: `0x801A6D88`.
+- Splitting at the jumps gives **144 animations** for Zangief (stance, walk, normals, Double Lariat, Spinning Piledriver, costume moves, bear, hits, knock-downs, wins…).
+- **Costume overlays.** A frame record with flag bit 0 is drawn with the **next** record on top, each at its own anchor. The bear, worker, cook and other costume frames come in pairs (odd = body, even = costume). Drawing a body frame alone shows Zangief without his costume, and the costume frame alone shows the skin without Zangief.
+- **Anchors.** Record `x, y` is the origin inside the frame, at the feet. Jumps (the Piledriver) are object movement, not anchors, so airborne frames need a vertical offset baked in when converted.
