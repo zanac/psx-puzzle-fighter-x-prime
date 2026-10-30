@@ -605,7 +605,7 @@ and the Versus RESULT table lists them with separate counters. Code:
 - **Lines.** A 12th line, ZANGIEF; DAN and ZANGIEF are always shown, AKUMA and DEVILOT when unlocked (12-entry copies of the name, column and line tables). Totals go from row 19 to 20, the menu from rows 22/24/26 to 23/25/27.
 - **Card block.** The save is one 0x400-byte block built at 0x80010000 (card frame 0x2000 in a fresh card: 0x200 of header and icon, then the game data). The counters are at +0x268 (44 words), copied back by 0x80104054, which also runs at boot (the game loads the card by itself).
 - **Dan on the card.** Vanilla zeroes a secret character's counters before saving when it was only reached by its code this session (Dan: 0x80103F04, flag 0x8016CAFA clear, "used" 0x801BF120 set). Dan is listed like everyone now, so that step is skipped (0x80103F10 branches over it).
-- **Tested in the emulator with a memory card** (pcsx_rearmed option `pcsx_rearmed_memcard1 = libretro`; lr.py has no card unless it is passed). Zangief beats Dan, then BACKUP → SAVE DATA. On a fresh boot with that card, ZANGIEF 1 / DAN 1 come back; one more match gives 2 / 2.
+- **Tested in the emulator with a memory card** (pcsx_rearmed option `pcsx_rearmed_memcard1 = libretro`; lr.py has no card unless it is passed). Zangief beats Dan, then BACKUP → SAVE DATA. On a fresh boot with that card, ZANGIEF 1 / DAN 1 come back; one more match gives 2 / 2. `tools/cardtest.py` runs this test.
 - **Save.** His counters go in the unused tail of the save block (+0x380: 'ZGST', 4 words, sum), written by xp_rssave and read back by xp_rsload; an older save gives zero. CLEAR RESULT clears them too.
 
 ### Icon grid

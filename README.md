@@ -251,6 +251,7 @@ P2's L1/R1 do nothing.
 | `tools/findpat.py` | scan a file for drop-pattern-shaped tables |
 | `src/xprime.asm` | the executable patch (with `src/stage.asm`, `src/zangief.asm`) |
 | `tools/regress.py` | end-to-end regression in the emulator (screens, damage, secrets, Zangief's Arcade and ending) |
+| `tools/cardtest.py` | memory card round trip of the RESULT counters (save, reboot, load) in the emulator |
 | `tools/model.py` | Python model of the arcade X' damage formula (for tests) |
 | `tools/nav.py` | menu navigation helpers for the emulator tests |
 | `tools/lr.py` | headless libretro frontend (input scripting, RAM access, savestates, screenshots, watchpoints) |
