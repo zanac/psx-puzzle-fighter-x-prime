@@ -1,6 +1,6 @@
 # Plan: Zangief from Pocket Fighter as a hidden character
 
-Branch: `experimental/new-character`. Status: **step 0 (research) in progress**; findings in [NEW-CHARACTER-RESEARCH.md](NEW-CHARACTER-RESEARCH.md).
+Branch: `experimental/new-character`. Status: **step 0 done, step 1 done**; findings in [NEW-CHARACTER-RESEARCH.md](NEW-CHARACTER-RESEARCH.md).
 
 ## Decisions (agreed)
 

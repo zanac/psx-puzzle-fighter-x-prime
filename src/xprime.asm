@@ -586,5 +586,6 @@ xp_marker_clear:
 	jal     xp_stage                ; stage index (vanilla: lbu v0, 0x68(s2))
 
 .include "src/stage.asm"
+.include "src/files.asm"
 
 .close

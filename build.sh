@@ -7,6 +7,8 @@
 #         or a single-disc PBP.
 # Output: <output>.bin + <output>.cue + <output>.pbp, whatever the input.
 # Needs:  python3, armips (pass its path as 3rd argument or have it in PATH).
+# Extra:  XP_NEWFILES="NAME=FILE ..." adds files to /DATA (new file ids 0x56,
+#         0x57, ... in that order); the CD-DA tracks move after them.
 set -e
 
 if [ $# -lt 2 ]; then
@@ -23,8 +25,11 @@ trap 'rm -rf "$TMP"' EXIT
 
 python3 "$HERE/tools/extract.py" "$IN" /SLUS_004.18 "$TMP/SLUS_004.18"
 python3 "$HERE/tools/checkexe.py" "$TMP/SLUS_004.18"
+# file table: original files, moved CD-DA tracks, new files (src/files.asm)
+python3 "$HERE/tools/discexpand.py" table "$IN" "$TMP/SLUS_004.18" "$TMP/files.bin" ${XP_NEWFILES:-}
 "$ARMIPS" "$HERE/src/xprime.asm" -root "$HERE" \
-	-strequ IN "$TMP/SLUS_004.18" -strequ OUT "$TMP/SLUS_004.18.xp"
+	-strequ IN "$TMP/SLUS_004.18" -strequ OUT "$TMP/SLUS_004.18.xp" \
+	-strequ XP_TABLE "$TMP/files.bin"
 # Counter Gem previews on the character select are pre-drawn art: redraw the
 # characters whose drop pattern changes, from the patched EXE's table
 for EMI in FIRST FIRSTE; do
@@ -33,8 +38,10 @@ for EMI in FIRST FIRSTE; do
 	# select-screen name labels for Mei-Ling and Anita
 	python3 "$HERE/tools/labels.py" "$TMP/$EMI.EMI.pv" "$TMP/$EMI.EMI.xp"
 done
-python3 "$HERE/tools/discout.py" "$IN" "$OUT" \
+ADDS=""
+for f in ${XP_NEWFILES:-}; do ADDS="$ADDS +$f"; done
+python3 "$HERE/tools/makedisc.py" "$IN" "$OUT" \
 	"/SLUS_004.18=$TMP/SLUS_004.18.xp" \
 	"/DATA/FIRST.EMI=$TMP/FIRST.EMI.xp" \
-	"/DATA/FIRSTE.EMI=$TMP/FIRSTE.EMI.xp"
+	"/DATA/FIRSTE.EMI=$TMP/FIRSTE.EMI.xp" $ADDS
 echo "done: $OUT"

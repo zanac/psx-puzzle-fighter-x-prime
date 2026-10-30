@@ -123,3 +123,29 @@ A crop of Zangief's Pocket Fighter stage will have to be redrawn into the SPF2T 
 ## Corrections
 
 The note in `src/stage.asm` said that the reused function at `0x801544E4` never runs, "per emulator coverage". That first coverage run was **not actually active**: the debugger flag was off, so it recorded nothing. It has now been redone properly on the original disc, through boot, attract, menus, Versus select and a match: 37,793 code words were covered and **0** of them fall in `0x801544E4–0x801548C8`. The claim holds.
+
+## Step 1: room on the disc (done)
+
+**Tools.**
+- `tools/discexpand.py` adds files to `/DATA`:
+  - each file gets its own Mode 2 Form 1 sectors right after the last file of the data track;
+  - a 150-sector postgap follows, as on the original disc;
+  - the CD-DA tracks move after them, by the same amount;
+  - the PVD volume size grows by that amount, and the directory entries are added in sorted order (the `/DATA` directory had 1568 free bytes).
+- `tools/makedisc.py` replaces files, adds the new ones and writes BIN + CUE + PBP.
+- A PBP input keeps its own header and PSP loader: `discout.to_raw` and the template path of `write_pbp`. The TOC follows the moved tracks.
+
+**EXE (`src/files.asm`).**
+- The file LBA table (`0x80165CC0`, 0x54 files plus the CD-DA tracks at ids 0x54/0x55) cannot grow in place, so it moves to `0x801548C8`. That is a 512-byte function with no references and no execution in coverage (boot, menus, Versus, Arcade, Street Puzzle).
+- Its only two readers are repointed: the file loader `0x801044A8` and the XA player `0x801063A4`.
+- New files get ids 0x56, 0x57, … in the order given to `XP_NEWFILES` (see `build.sh`).
+
+**Checks.**
+- With no new files, the disc differs from the previous build only in 3 EXE sectors, and the regression passes.
+- With two dummy files (300 KB and a copy of `STAGE03.EMI`):
+  - the CD-DA moved by 183 sectors, byte for byte;
+  - the files read back from the ISO are identical to the originals;
+  - pointing stage 1's table entry at the copy in RAM loads it from the new location: Ken's background appears in a Chun-Li stage match;
+  - the regression passes on both the PBP and the BIN/CUE outputs;
+  - a BIN input gives the same output as a PBP input.
+- The game never reads the CD-DA tracks in attract mode, and no file load uses ids 0x54/0x55. They may be unused (bonus audio), but their LBAs are moved anyway.

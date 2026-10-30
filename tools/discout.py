@@ -139,6 +139,23 @@ def load(path):
     img.data = data
     return Disc(img, tracks, len(data) // SECT, False)
 
+def to_raw(disc):
+    """A PBP disc as a raw (BIN-like) disc, so its size can change. The PBP
+    header, PSP loader and STARTDAT trailer are kept as a template for
+    write_pbp."""
+    if not disc.pbp:
+        return disc
+    raw = bytearray()
+    for b in disc.blocks():
+        raw += b
+    pimg = disc.img
+    start = pimg.psar + struct.unpack_from('<I', pimg.raw, pimg.psar + 0xC)[0]
+    img = D.BinImage.__new__(D.BinImage)
+    img.data = raw
+    out = Disc(img, list(disc.tracks), len(raw) // SECT, False)
+    out.template = (bytes(pimg.raw[:pimg.psar + 0x100000]), bytes(pimg.raw[start:]), pimg.psar)
+    return out
+
 # ---------------- output ----------------
 def write_bin(disc, base):
     with open(base + '.bin', 'wb') as out:
@@ -183,9 +200,47 @@ def _toc(disc):
                    tuple(bcd(x) for x in msf(i0 + 150)), tuple(bcd(x) for x in msf(i1 + 150)))
     return toc
 
+def _write_psar(out, psar, disc):
+    """Compressed blocks + index after a header already written up to
+    psar + 0x100000. Returns the size of the data area."""
+    idx, off = bytearray(), 0
+    for b in disc.blocks():
+        c = zlib.compressobj(9, zlib.DEFLATED, -15)
+        blk = c.compress(b) + c.flush()
+        if len(blk) >= len(b):
+            blk = b
+        idx += struct.pack('<IHH', off, len(blk), 0) + hashlib.sha1(blk).digest()[:16] + b'\0' * 8
+        out.write(blk)
+        off += len(blk)
+    pad = (-off) % 16
+    out.write(b'\0' * pad)
+    assert len(idx) <= 0x100000 - 0x4000, 'image too large for one PSISOIMG'
+    end = out.tell()
+    out.seek(psar + 0x4000)
+    out.write(b'\0' * (0x100000 - 0x4000))
+    out.seek(psar + 0x4000)
+    out.write(idx)
+    out.seek(end)
+    return off + pad
+
 def write_pbp(disc, path):
     if disc.pbp:
         disc.img.save(path)
+        return
+    tpl = getattr(disc, 'template', None)
+    if tpl:
+        # original header and PSP loader; new TOC, index, data; STARTDAT after
+        head, trailer, psar = tpl
+        head = bytearray(head)
+        toc = _toc(disc)
+        head[psar + 0x800:psar + 0xC00] = bytes(0x400)
+        head[psar + 0x800:psar + 0x800 + len(toc)] = toc
+        with open(path, 'wb') as out:
+            out.write(head)
+            size = _write_psar(out, psar, disc)
+            out.write(trailer)
+            out.seek(psar + 0xC)
+            out.write(struct.pack('<I', 0x100000 + size))
         return
     sfo = _sfo([('BOOTABLE', 1), ('CATEGORY', 'ME'), ('DISC_ID', DISC_ID), ('DISC_VERSION', '1.00'),
                 ('LICENSE', 'Built by the X\' patch tools'), ('PARENTAL_LEVEL', 3),
@@ -201,22 +256,9 @@ def write_pbp(disc, path):
     with open(path, 'wb') as out:
         out.write(hdr + sfo + b'\0' * (psar - 0x28 - len(sfo)))
         out.write(head)
-        idx, off = bytearray(), 0
-        for b in disc.blocks():
-            c = zlib.compressobj(9, zlib.DEFLATED, -15)
-            blk = c.compress(b) + c.flush()
-            if len(blk) >= len(b):
-                blk = b
-            idx += struct.pack('<IHH', off, len(blk), 0) + hashlib.sha1(blk).digest()[:16] + b'\0' * 8
-            out.write(blk)
-            off += len(blk)
-        pad = (-off) % 16
-        out.write(b'\0' * pad)
-        assert len(idx) <= 0x100000 - 0x4000, 'image too large for one PSISOIMG'
-        out.seek(psar + 0x4000)
-        out.write(idx)
+        size = _write_psar(out, psar, disc)
         out.seek(psar + 0xC)
-        out.write(struct.pack('<I', 0x100000 + off + pad))
+        out.write(struct.pack('<I', 0x100000 + size))
 
 def write_all(disc, base):
     """base.bin + base.cue + base.pbp"""
