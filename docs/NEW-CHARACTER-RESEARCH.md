@@ -187,3 +187,28 @@ So Zangief can keep Dan's state machine and attack code, with his own list of sc
 - Splitting at the jumps gives **144 animations** for Zangief (stance, walk, normals, Double Lariat, Spinning Piledriver, costume moves, bear, hits, knock-downs, wins…).
 - **Costume overlays.** A frame record with flag bit 0 is drawn with the **next** record on top, each at its own anchor. The bear, worker, cook and other costume frames come in pairs (odd = body, even = costume). Drawing a body frame alone shows Zangief without his costume, and the costume frame alone shows the skin without Zangief.
 - **Anchors.** Record `x, y` is the origin inside the frame, at the feet. Jumps (the Piledriver) are object movement, not anchors, so airborne frames need a vertical offset baked in when converted.
+
+## Step 3: in-match sprites and animations (done)
+
+**Build.** `XP_PF=<Pocket Fighter image> ./build.sh …` runs `tools/zangief.py`, which writes `PL0B_OBJ.EMI` (new file id 0x56) from `/PLAYER/ZANGIEF.PAC` and `/MDL/PL09A.MDL` on the user's disc.
+- Frames: Pocket Fighter records composited with their costume overlay, kept facing left (the game mirrors P1), scaled to 0.65 around the feet, quantised to one 15-colour palette. 42 frames, 0xEAA0 bytes of graphics. The Piledriver frames get a vertical lift.
+- Record entry, loaded at the player's bank (P1 `0x800E7600`, P2 `0x800EBB00`): 44-byte records, then at +0x2C00 the palette block (4 colour sets × 4 palettes: Zangief + Dan's 3 effect palettes), then at +0x2E00 the 51 state offsets and the 16-byte scripts.
+- Colour sets follow the confirm button like the others: set 1 (X) is the original red, then blue, green and dark. A Zangief facing Dan or another Zangief in P2 gets the alternate set, as for any same-slot match-up.
+
+**Hooks** (`src/zangief.asm`, code at `0x80151AC0`, an unreferenced 440-byte function that never runs; installed only when the build has the file):
+
+| Where | What |
+|---|---|
+| `0x8010BB1C` (character file load) | Zangief loads file 0x56 with its own "loaded file" cache value (11), so switching Dan ↔ Zangief reloads. |
+| `0x80136430`, `0x801364DC` (start a state) | Zangief's scripts from his bank (states 23/24, the select-screen poses, stay Dan's). |
+| `0x80136860` (palette upload, `0x80136824`) | Zangief's palette block from his bank. |
+
+**States** (Dan's 51, the logic stays Dan's): idle 0–2 and 37/43–50; win entry 3 and random win poses 4/31–34 (table `0x80171C20`); lose 5/30/38; reaction to an incoming attack 6/7/8 = 6 + strength (`0x801355EC`); attacks 10–13 = 10 + level; super 14. The scripts carry no effect events, so Dan's Gadoken is not thrown.
+
+**Correction.** Dan's states 7/8 (frames 201/202, arms up) are his reaction to being hit, not a taunt. SPF2T has no taunt; Zangief's provocation pose is among his random win poses (31, 34) instead.
+
+**Checks** (`XP_PF` build):
+- Versus Zangief vs Mei-Ling: idle, attacks (punch, Piledriver seen in play), super (bear, burst, pose), hit reactions, K.O. and win, all in game.
+- Zangief vs Zangief, Dan vs Zangief, Zangief vs Akuma: both sprites and palettes correct.
+- After a match, the loser switching from Zangief to Dan gets Dan's graphics again.
+- Damage fuzz 120/120 with Zangief; full regression passes on the `XP_PF` build and on the plain build (which also reproduces `xprime-patch.json`).

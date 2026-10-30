@@ -254,3 +254,149 @@ XP_ZBITS:
 	nop
 	nop
 	nop
+
+; ============================================================================
+; In-match graphics and animations (step 3)
+; Zangief's file PL0B_OBJ.EMI (built by tools/zangief.py from Pocket
+; Fighter) replaces Dan's PL9A when the player is Zangief. Its record entry
+; (loaded at the player's record bank) also holds his palette block and his
+; state list + animation scripts, at fixed offsets.
+; Code space: 0x80151AC0, a 440-byte function with no references that never
+; runs (same coverage as above).
+; ============================================================================
+ZG_FILE   equ 0x56              ; first file of XP_NEWFILES (build.sh)
+ZG_GROUP  equ 11                ; "loaded file" cache value for Zangief
+ZG_PALOFF equ 0x2C00            ; tools/zangief.py PALOFF
+ZG_LISTOFF equ 0x2E00           ; tools/zangief.py LISTOFF
+BANK_P1   equ 0x800E7600
+BANK_P2   equ 0x800EBB00
+
+.org 0x80151AC0
+.area 0x1B8, 0
+
+; character file load (0x8010BB1C): a0 = player 0/1, s0 = its character
+; byte, s1 = its "loaded file" cache byte. Same logic as the vanilla code
+; (group table 0x80169E14, file table 0x80169DE8), plus Zangief.
+xp_zload:
+	li      t1, 1
+	sllv    t1, t1, a0              ; player bit
+	lb      a0, 0(s0)
+	lb      v1, 0(s1)
+	la      at, 0x80169E14
+	addu    at, at, a0
+	lb      v0, 0(at)               ; group
+	sll     t0, a0, 2
+	la      at, 0x80169DE8
+	addu    at, at, t0
+	lw      t0, 0(at)               ; file id
+	li      at, ZG_CHAR
+	bne     a0, at, @@cmp
+	lui     at, hi(XP_ZBITS)
+	lbu     at, lo(XP_ZBITS)(at)
+	nop
+	and     at, at, t1
+	beqz    at, @@cmp
+	nop
+	li      v0, ZG_GROUP
+	li      t0, ZG_FILE
+@@cmp:
+	beq     v1, v0, @@done
+	sb      v0, 0(s1)
+	jal     0x801043C0
+	move    a0, t0
+@@done:
+	j       0x8010BB78
+	nop
+
+; is the object s1 / a0 Zangief? Inline test used by the two hooks below:
+; obj+0x74 = character, obj+0x73 = side (0 P1, 1 P2).
+
+; animation state start (0x80136430 and 0x801364DC): v0 = the character's
+; state list, a1 = state * 4, s1 = object. Out: s0 = script pointer.
+; Leaf; keeps a0 (the object), uses at, v0, v1, t8, t9.
+xp_zstate:
+	addu    t9, v0, a1
+	lw      s0, 0(t9)               ; vanilla
+	lb      v0, 0x74(s1)
+	li      at, ZG_CHAR
+	bne     v0, at, @@ret
+	lb      t8, 0x73(s1)
+	li      v1, 1
+	sllv    v1, v1, t8
+	lui     at, hi(XP_ZBITS)
+	lbu     at, lo(XP_ZBITS)(at)
+	nop
+	and     at, at, v1
+	beqz    at, @@ret
+	addiu   v1, a1, -23 * 4         ; 23/24: select-screen poses stay Dan's
+	sltiu   v1, v1, 8
+	bnez    v1, @@ret
+	li      v1, BANK_P1
+	beqz    t8, @@bank
+	nop
+	li      v1, BANK_P2
+@@bank:
+	addu    t9, v1, a1
+	lw      t9, ZG_LISTOFF(t9)
+	nop
+	addu    s0, v1, t9
+@@ret:
+	jr      ra
+	nop
+
+; palette upload (0x80136860, in 0x80136824): a0 = object, v1 = palette
+; pool 0x800F8440. Out: a0 = source of the 4 palettes. Leaf; keeps a1-a3.
+xp_zpal:
+	lb      v0, 0x74(a0)
+	lb      t9, 0x79(a0)            ; colour set
+	lb      t8, 0x73(a0)            ; side
+	sll     t9, t9, 7
+	li      at, ZG_CHAR
+	bne     v0, at, @@vanilla
+	li      at, 1
+	sllv    at, at, t8
+	lui     a0, hi(XP_ZBITS)
+	lbu     a0, lo(XP_ZBITS)(a0)
+	nop
+	and     at, at, a0
+	beqz    at, @@vanilla
+	li      a0, BANK_P1 + ZG_PALOFF
+	beqz    t8, @@zg
+	nop
+	li      a0, BANK_P2 + ZG_PALOFF
+@@zg:
+	jr      ra
+	addu    a0, a0, t9
+@@vanilla:
+	sll     v0, v0, 9
+	addu    a0, v0, t9
+	jr      ra
+	addu    a0, a0, v1
+
+.endarea
+
+; hooks only when the build has Zangief's file (XP_PF in build.sh);
+; otherwise he keeps Dan's in-match look
+.if ZG_HAVE
+.org 0x8010BB1C
+	j       xp_zload
+	nop
+
+.org 0x80136430
+	jal     xp_zstate
+	sra     a1, a1, 0xE
+	nop
+.org 0x801364DC
+	jal     xp_zstate
+	sra     a1, a1, 0xE
+	nop
+
+.org 0x80136860
+	jal     xp_zpal
+	nop
+	jal     0x80108C68
+	nop
+	nop
+	nop
+	nop
+.endif

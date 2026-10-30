@@ -7,12 +7,15 @@
 #         or a single-disc PBP.
 # Output: <output>.bin + <output>.cue + <output>.pbp, whatever the input.
 # Needs:  python3, armips (pass its path as 3rd argument or have it in PATH).
-# Extra:  XP_NEWFILES="NAME=FILE ..." adds files to /DATA (new file ids 0x56,
-#         0x57, ... in that order); the CD-DA tracks move after them.
+# Zangief: XP_PF=<Pocket Fighter NTSC-U image (SLUS-00653), .cue/.bin/.pbp>
+#         builds his graphics and animations from your own Pocket Fighter disc
+#         (tools/zangief.py). Without it he keeps Dan's look in the match.
+# Extra:  XP_NEWFILES="NAME=FILE ..." adds files to /DATA (new file ids after
+#         Zangief's, in that order); the CD-DA tracks move after them.
 set -e
 
 if [ $# -lt 2 ]; then
-	sed -n '2,10p' "$0"
+	sed -n '2,13p' "$0"
 	exit 1
 fi
 
@@ -25,11 +28,24 @@ trap 'rm -rf "$TMP"' EXIT
 
 python3 "$HERE/tools/extract.py" "$IN" /SLUS_004.18 "$TMP/SLUS_004.18"
 python3 "$HERE/tools/checkexe.py" "$TMP/SLUS_004.18"
+NEWFILES=${XP_NEWFILES:-}
+ZG_HAVE=0
+if [ -n "${XP_PF:-}" ]; then
+	# Zangief's in-match file, from Pocket Fighter (first new file: id 0x56)
+	python3 "$HERE/tools/extract.py" "$XP_PF" /PLAYER/ZANGIEF.PAC "$TMP/ZANGIEF.PAC"
+	python3 "$HERE/tools/extract.py" "$XP_PF" /MDL/PL09A.MDL "$TMP/PL09A.MDL"
+	python3 "$HERE/tools/extract.py" "$IN" /DATA/FIRST.EMI "$TMP/FIRST.EMI"
+	python3 "$HERE/tools/extract.py" "$IN" /DATA/PL9A_OBJ.EMI "$TMP/PL9A_OBJ.EMI"
+	python3 "$HERE/tools/zangief.py" "$TMP/ZANGIEF.PAC" "$TMP/PL09A.MDL" \
+		"$TMP/FIRST.EMI" "$TMP/PL9A_OBJ.EMI" "$TMP/PL0B_OBJ.EMI"
+	NEWFILES="PL0B_OBJ.EMI=$TMP/PL0B_OBJ.EMI $NEWFILES"
+	ZG_HAVE=1
+fi
 # file table: original files, moved CD-DA tracks, new files (src/files.asm)
-python3 "$HERE/tools/discexpand.py" table "$IN" "$TMP/SLUS_004.18" "$TMP/files.bin" ${XP_NEWFILES:-}
+python3 "$HERE/tools/discexpand.py" table "$IN" "$TMP/SLUS_004.18" "$TMP/files.bin" $NEWFILES
 "$ARMIPS" "$HERE/src/xprime.asm" -root "$HERE" \
 	-strequ IN "$TMP/SLUS_004.18" -strequ OUT "$TMP/SLUS_004.18.xp" \
-	-strequ XP_TABLE "$TMP/files.bin"
+	-strequ XP_TABLE "$TMP/files.bin" -equ ZG_HAVE $ZG_HAVE
 # Counter Gem previews on the character select are pre-drawn art: redraw the
 # characters whose drop pattern changes, from the patched EXE's table
 for EMI in FIRST FIRSTE; do
@@ -39,7 +55,7 @@ for EMI in FIRST FIRSTE; do
 	python3 "$HERE/tools/labels.py" "$TMP/$EMI.EMI.pv" "$TMP/$EMI.EMI.xp"
 done
 ADDS=""
-for f in ${XP_NEWFILES:-}; do ADDS="$ADDS +$f"; done
+for f in $NEWFILES; do ADDS="$ADDS +$f"; done
 python3 "$HERE/tools/makedisc.py" "$IN" "$OUT" \
 	"/SLUS_004.18=$TMP/SLUS_004.18.xp" \
 	"/DATA/FIRST.EMI=$TMP/FIRST.EMI.xp" \
