@@ -8,7 +8,7 @@ character has a 36x24 preview (6x4 gems of 6x6 pixels, top row = pattern
 row 4).
 
 usage: previews.py EXE IN.EMI OUT.EMI [--chars 0,2,4,6,7] [--check]
-  --chars  character ids to redraw (default: all). The original art of
+  --chars  character ids to redraw (default: all; 11 = Zangief). The original art of
            Devilot (8) has rows 2 and 4 swapped versus its table, so the
            build only redraws the characters whose pattern X' changes.
   --check  only verify that the previews in IN.EMI match EXE's table
@@ -21,13 +21,19 @@ PATTERNS = 0x6EE84          # file offset of 0x8016E684 in SLUS_004.18
 # preview origin (u, v) in the texture page, per character id
 ORIGIN = [(0, 96), (40, 96), (80, 96), (120, 96), (160, 96),
           (0, 120), (40, 120), (80, 120), (120, 120), (160, 120),
-          (72, 152)]
+          (72, 152),
+          (152, 152)]           # 11: Zangief (free area; src/zangief.asm, xp_zpv)
+# Zangief's pattern ("Siberian Bear", XP_ZPATTERN in src/zangief.asm) is not in
+# the EXE's table: the 4 bottom rows, bottom first (1 Blue 2 Yellow 3 Green 4 Red)
+ZANGIEF = [[3, 3, 3, 2, 2, 2], [3, 3, 3, 2, 2, 2], [4, 4, 4, 1, 1, 1], [4, 4, 4, 1, 1, 1]]
 # colour id -> (light, dark) palette index
 SHADES = {1: (4, 5), 2: (8, 9), 3: (6, 7), 4: (2, 3)}
 BORDER, SHINE = 1, 0xD
 
 def pattern(exe, ch):
     """4 bottom rows of a character's pattern, as lists of 6 colour ids."""
+    if ch == 11:
+        return ZANGIEF
     base = PATTERNS + ch * 0xC0
     return [list(struct.unpack_from('<6H', exe, base + r * 16)) for r in range(4)]
 
@@ -67,6 +73,12 @@ def main(argv):
     for ch in chars:
         u, v = ORIGIN[ch]
         img = render(pattern(exe, ch))
+        if ch == 11 and not check:
+            # empty area: start from Dan's whole 40x24 tile block
+            du, dv = ORIGIN[10]
+            for y in range(24):
+                for x in range(40):
+                    put_px(emi, u + x, v + y, get_px(emi, du + x, dv + y))
         for y in range(24):
             for x in range(36):
                 if check:

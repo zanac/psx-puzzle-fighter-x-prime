@@ -196,13 +196,12 @@ xp_stage:
 	jr      ra
 	sb      t4, 2(t2)
 
-; ---- character select: Up on a secret character cycles back ----
-; xp_move (0x8013AD30) branches here on Up, with t0 = cursor position,
-; t1 = t0 - 4, t4 = hi(ALT_BITS), t5 = this player's alt bit, t7/t8 =
-; Mei-Ling/Anita bits, t3 = t9 = 0. On the bottom row, while the cell shows
-; a secret character, Up walks the Down ring backwards:
-;   Anita -> Mei-Ling -> Dan -> Akuma -> Devilot -> cell character
-; Otherwise (top row, or the cell's own character) Up moves as in vanilla.
+; ---- character select: Up cycles back (see zangief.asm) ----
+; Up on the bottom row while a secret character is shown walks the Down ring
+; backwards: Zangief -> Anita -> Mei-Ling -> Dan -> Akuma -> Devilot -> cell.
+; (kept here: xp_move's branches must reach it)
+; Branched to from xp_move on Up with t0 = cursor position, t1 = t0 - 4,
+; t4 = hi(ALT_BITS), t5 = player bit, t7/t8 = Mei-Ling/Anita bits.
 xp_up:
 	sltiu   v0, t0, 4
 	bnez    v0, @@vanilla           ; top row
@@ -212,7 +211,17 @@ xp_up:
 	bnez    v0, @@alts
 	li      v0, 8
 	beq     t2, v0, @@cell          ; Devilot -> cell character
+	li      v0, ZG_CHAR
+	bne     t2, v0, @@down1
 	nop
+	jal     xp_zbit
+	nop
+	beqz    v1, @@down1
+	nop
+	move    t9, t5                  ; Zangief -> Anita
+	j       xp_mv_apply
+	li      t2, 5
+@@down1:
 	j       xp_mv_apply             ; Dan -> Akuma -> Devilot
 	addiu   t2, t2, -1
 @@alts:
@@ -222,7 +231,7 @@ xp_up:
 	beqz    v1, @@vanilla           ; plain Hsien-Ko
 	nop
 	j       xp_mv_apply             ; Mei-Ling -> Dan
-	li      t2, 10
+	li      t2, ZG_CHAR
 @@anita:
 	li      v0, 5
 	bne     t2, v0, @@vanilla
@@ -237,6 +246,11 @@ xp_up:
 	nop
 @@vanilla:
 	j       xp_mv_updown
+	nop
+
+; branch target for xp_move (zangief.asm is out of branch range)
+xp_zg_anita_t:
+	j       xp_zg_anita
 	nop
 
 ; ---- select setup helpers (CHALLENGE in xprime.asm) ----

@@ -16,6 +16,9 @@ TITLE_COL    equ 11                     ; "X' BALANCE PATCH BY ZANAC" on the tit
 TITLE_ROW    equ 28
 MODE         equ 0x8019C40F             ; game mode of the match (3 = Versus)
 MODE_NEXT    equ 0x8019C3FF             ; mode being set up (on the select screen)
+ZG_CHAR      equ 10                     ; Zangief's host slot: Dan (zangief.asm)
+P1_STRUCT    equ 0x801AE500
+ZG_MAGIC     equ 0x5A                   ; t1 marker: "apply sets the Zangief bit"
 
 ; ============================================================================
 ; DROP PATTERNS  (table at 0x8016E684, 11 chars x 0xC0, rows bottom first)
@@ -70,12 +73,12 @@ DMGTAB equ 0x8016E5F4
 	.halfword 90, 120, 150, 180, 210, 240, 270, 2970
 	; +0x10 receive rate /20, indexed by the receiving player's character
 	;       (looked up through the attacker's opponent pointer +0x84)
-	;        Mor  Chun Ryu  Ken  Hsien Don  Fel  Sak  Devi Akuma Dan
-	.byte    20,  20,  20,  20,  20,   20,  20,  20,  20,  24,   22,  20, 20, 20, 20, 20
+	;        Mor  Chun Ryu  Ken  Hsien Don  Fel  Sak  Devi Akuma Dan  Zangief
+	.byte    20,  20,  20,  20,  20,   20,  20,  20,  20,  24,   22,  18, 20, 20, 20, 20
 	; +0x20 margin time numerators /10
 	.halfword 10, 11, 12, 13, 14, 15, 16, 17
 	; +0x30 send rate /20, indexed by own character
-	.byte    20,  24,  20,  20,  20,   20,  20,  20,  17,  20,   22,  20, 20, 20, 20, 20
+	.byte    20,  24,  20,  20,  20,   20,  20,  20,  17,  20,   22,  18, 20, 20, 20, 20
 	; +0x40 damage level numerators /10 (option 0..3)
 	.halfword 8, 10, 13, 15, 15, 15, 15, 15
 .endarea
@@ -139,7 +142,7 @@ xp_damage:
 	; receive rate (opponent's character, as in the arcade patch)
 	lw      t6, 0x84(a0)
 	nop
-	lbu     t7, 0x68(t6)
+	jal     xp_zchar                ; t7 = character (11 = Zangief)
 	li      t3, 20
 	addu    t7, t1, t7
 	lbu     t2, 0x10(t7)
@@ -147,7 +150,8 @@ xp_damage:
 	nop
 
 	; send rate (own character)
-	lbu     t7, 0x68(a0)
+	move    t6, a0
+	jal     xp_zchar
 	li      t3, 20
 	addu    t7, t1, t7
 	lbu     t2, 0x30(t7)
@@ -325,9 +329,9 @@ xp_move:
 	li      v0, 10
 	bne     t2, v0, xp_mv_not_dan
 	slti    v0, t2, 8
-	li      t2, 4                       ; Dan -> Mei-Ling
-	b       xp_mv_apply
+	j       xp_zg_dan                   ; Dan -> Mei-Ling, Zangief -> cell
 	move    t3, t5
+	nop
 xp_mv_not_dan:
 	bnez    v0, xp_mv_not_secret
 	li      v0, 4
@@ -345,7 +349,7 @@ xp_mv_not_meiling:
 	li      v0, 5
 	bne     t2, v0, xp_mv_to_devilot
 	and     v1, t8, t5
-	bnez    v1, xp_mv_cell             ; Anita -> cell character
+	bnez    v1, xp_zg_anita_t          ; Anita -> Zangief (Versus) / cell
 	nop
 xp_mv_to_devilot:
 	b       xp_mv_apply
@@ -371,8 +375,8 @@ xp_mv_cell:                            ; t0 = cursor position
 	lbu     t2, 0(v0)
 
 xp_mv_apply:                                ; t2 = character, t3/t9 = alt bit to set
-	and     t7, t7, t6
-	or      t7, t7, t3
+	j       xp_zg_apply                 ; Mei-Ling bits + Zangief bit
+	nop
 	and     t8, t8, t6
 	or      t8, t8, t9
 	sb      t7, lo(ALT_BITS)(t4)
@@ -528,11 +532,11 @@ xp_marker_clear:
 
 ; ---- name label hooks ----
 .org 0x80116460
-	jal     xp_labelkey             ; P1: v1 = label key
+	jal     xp_labelkey2            ; P1: v1 = label key (zangief.asm)
 .org 0x801164C4
-	jal     xp_labelkey             ; P2: v1 = label key
+	jal     xp_labelkey2            ; P2: v1 = label key
 .org 0x801163DC
-	j       xp_labelframe           ; label setter tail (delay slot stores v1)
+	j       xp_labelframe2          ; label setter tail (delay slot stores v1)
 
 ; ============================================================================
 ; CHALLENGE: BOTH PLAYERS CHOOSE AGAIN
@@ -587,5 +591,6 @@ xp_marker_clear:
 
 .include "src/stage.asm"
 .include "src/files.asm"
+.include "src/zangief.asm"
 
 .close

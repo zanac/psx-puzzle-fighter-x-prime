@@ -149,3 +149,23 @@ The note in `src/stage.asm` said that the reused function at `0x801544E4` never 
   - the regression passes on both the PBP and the BIN/CUE outputs;
   - a BIN input gives the same output as a PBP input.
 - The game never reads the CD-DA tracks in attract mode, and no file load uses ids 0x54/0x55. They may be unused (bonus audio), but their LBAs are moved anyway.
+
+## Step 2: the slot (done)
+
+Zangief is Dan (10) plus a per-player bit in `XP_ZBITS` (bit 0 P1, bit 1 P2), set and read only in Versus. All code is in `src/zangief.asm`, in two unreferenced functions that never run (`0x80163CDC`, 684 bytes, and `0x801639F8`–`0x80163C24`).
+
+| Piece | How |
+|---|---|
+| Select cycle | Down: … Mei-Ling → Anita → **Zangief** → cell character; Up walks back (Zangief → Anita). In Arcade, Anita goes straight to the cell character. The bit is cleared with the alternate bits on a new game (`0x80123D80`). |
+| Name label | Label 13 (an unused small Japanese label) redrawn as ZANGIEF by `tools/labels.py`; it spans labels 13+14, and record 13 takes MORRIGAN's 5-column geometry so the whole 78-px label shows. Key `0x1A` (Dan \| 0x10) selects frame `0x40`. |
+| Counter Gem preview | The preview panel is a **tile script** (`0x80108924`: tile ids, row moves, attribute), one per character, from the table at `0x8016FA84`. The panel function `0x8013B0E8` picks it at `0x8013B15C`; `xp_zpv` returns Zangief's own script for character 10 + bit. His tiles are the free 40×24 block at (152,152) of the preview page (`FIRST.EMI`/`FIRSTE.EMI` 0x9D800), drawn by `tools/previews.py --chars …,11` from Dan's block plus the Siberian Bear pattern. |
+| Drop pattern | Pattern lookup `0x801350E4`: `xp_patchar` points it at `XP_ZPATTERN` for Zangief. |
+| Damage | `xp_zchar` gives index 11 in `DMGTAB` (send 90 %, receive 90 %); `tools/model.py` knows it. |
+
+**Checks.**
+- Select: the cycle and the Up walk-back, both players; the label and the preview (red/blue over green/yellow).
+- Arcade: Down from Anita goes to the cell character; the bit stays 0.
+- A Versus match Zangief vs Mei-Ling: the pattern comes from his table, and the damage fuzz matches the model 120/120 with Zangief on both sides.
+- Full regression: passes (damage 150/150).
+
+**Still Dan's until later steps:** the select portrait (step 5), in-match sprites (3), voices (4), stage and music (6). The RESULT screen counts him as Dan.

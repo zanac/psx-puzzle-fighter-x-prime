@@ -23,7 +23,7 @@ R['sel']=(e.r8(0x801baac4),e.r8(0x801baac8),e.r8(0x801ae4d8),e.r8(0x801ae4d9))
 sh('select')
 charsel_to_match(e); e.run(30); sh('match')
 # damage fuzz
-e.dbg(); e.snap(0x801ae500,0x2ac*2); e.snap(0x8019c400,0x20); e.bp(0x80134d80); e.bp(0x80134e74)
+e.dbg(); e.snap(0x801ae500,0x2ac*2); e.snap(0x8019c400,0x20); e.bp(0x80134d80); e.bp(0x80134f58)   # entry; vanilla tail with a3 = damage
 random.seed(9); n=ok=0; pend=None
 for step in range(30000):
     if step%20==0:
@@ -40,7 +40,7 @@ for step in range(30000):
             opp=struct.unpack_from('<I',s,o+0x84)[0]-0x801ae500
             pend=xprime(sum(h(0x10c+2*k) for k in range(7)),h(0x1f0),s[o+0x68],s[opp+0x68],s[o+0x23f],s[0x2ac*2+5])
         elif pend is not None:
-            n+=1; ok+= x['gpr'][8]==pend; pend=None
+            n+=1; ok+= x['gpr'][7]==pend; pend=None
     if n>=150: break
 e.dbg(False); e.dbg_clear()
 R['damage']=(n,ok)

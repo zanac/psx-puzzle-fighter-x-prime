@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build the character-select name labels for Mei-Ling and Anita.
+"""Build the character-select name labels for Mei-Ling, Anita and Zangief.
 
 The labels are LZ-compressed 4bpp strips (256x16, see lzh.py) in FIRST.EMI /
 FIRSTE.EMI: a graphics bank (container entry 30, file offset 0xC7800, loaded
@@ -23,6 +23,7 @@ BANK = 0xC7800
 RECORDS = 0xEF8C4
 REC_SIZE = 0x2C
 MORRIGAN, KEN, LEILEI, DEVILOT, GOUKI, AKUMA = 0, 3, 4, 8, 9, 11
+ZG_SLOT = 13                    # ZANGIEF: frame 0x33 + 13 = 0x40
 
 # (source label, first column, end column) of each letter, outlines included
 GLYPHS = {
@@ -36,6 +37,27 @@ GLYPHS = {
     'A': (AKUMA, 0, 16),
     'n': (KEN, 32, 48),         # wide N, matches the wide A
     'T': (DEVILOT, 66, 80),
+    'F': (6, 4, 15),            # FELICIA
+}
+# No vanilla label has a Z: drawn by hand in the same style (shades by row,
+# 15 = outline), for ZANGIEF
+CUSTOM = {
+    'Z': [".............",
+          "..ffffffffff.",
+          ".f1333333333f",
+          ".f2333333332f",
+          ".fffffff443f.",
+          "......f555f..",
+          ".....f666f...",
+          "....f777f....",
+          "...f777f.....",
+          "..f888f......",
+          ".f999fffffff.",
+          "f999999999af.",
+          "faaaaaaaaaadf",
+          "fbbbbbbbbbbdf",
+          "fcbbbbbbbbbdf",
+          "fffffffffffff"],
 }
 OUTLINE = 15
 DAN = 10
@@ -52,9 +74,14 @@ def label_pixels(emi, n):
 def compose(emi, text, width=80):
     cols = []
     for ch in text:
-        n, a, b = GLYPHS[ch]
-        src = label_pixels(emi, n)
-        g = [[src[y][x] for y in range(16)] for x in range(a, b)]
+        if ch in CUSTOM:
+            rows = CUSTOM[ch]
+            g = [[int(rows[y][x], 16) if rows[y][x] != '.' else 0 for y in range(16)]
+                 for x in range(len(rows[0]))]
+        else:
+            n, a, b = GLYPHS[ch]
+            src = label_pixels(emi, n)
+            g = [[src[y][x] for y in range(16)] for x in range(a, b)]
         if cols:
             # letters share their outline column
             last = cols[-1]
@@ -111,8 +138,24 @@ def main(argv):
     imgs[GOUKI] = compose(orig, 'MEI-LING')
     put_stream(emi, GOUKI, imgs[GOUKI], gou_off, dan_off + dan_len - gou_off)
 
+    # 4. ZANGIEF (PSX X' hidden character) in the two small labels 13 and 14
+    #    (small-font MORRIGAN / CHUN-LI, never decoded in boot, menus,
+    #    Versus, Arcade or Street Puzzle), which are contiguous
+    s13, s14 = record(orig, ZG_SLOT), record(orig, ZG_SLOT + 1)
+    l14 = lzh.decode(orig, BANK + s14)[1]
+    assert s13 + lzh.decode(orig, BANK + s13)[1] == s14
+    imgs[ZG_SLOT] = compose(orig, 'ZANGIEF')
+    put_stream(emi, ZG_SLOT, imgs[ZG_SLOT], s13, s14 + l14 - s13)
+    set_record(emi, ZG_SLOT + 1, s13)            # label 14 now shows ZANGIEF too
+    # the small labels are 4 cells (64 px) wide: give label 13 the 5-cell
+    # geometry of the full-size ones (x -40, 5 columns, mask) from MORRIGAN
+    r13 = RECORDS + ZG_SLOT * REC_SIZE
+    emi[r13 + 4:r13 + 16] = orig[RECORDS + MORRIGAN * REC_SIZE + 4:RECORDS + MORRIGAN * REC_SIZE + 16]
+
     # untouched labels must decode exactly as before
     for n in range(15):
+        if n == ZG_SLOT + 1:
+            continue
         if n not in imgs:
             assert lzh.decode(emi, BANK + record(emi, n))[0] == lzh.decode(orig, BANK + record(orig, n))[0]
     if '--preview' in argv:
