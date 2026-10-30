@@ -169,3 +169,13 @@ Zangief is Dan (10) plus a per-player bit in `XP_ZBITS` (bit 0 P1, bit 1 P2), se
 - Full regression: passes (damage 150/150).
 
 **Still Dan's until later steps:** the select portrait (step 5), in-match sprites (3), voices (4), stage and music (6). The RESULT screen counts him as Dan.
+
+## Step 3 research: how a character is animated in a match
+
+- The character object (P1 `0x801D4E9C` in a Versus match) holds an **animation script pointer at +0x28** and a frame timer at +0x12. The draw code (`0x8010C800`) reads the frame index at script +4 and draws record `index` of the player's frame bank (P1 `0x800E7600`), through `0x8010CC48`.
+- **Script entry**, 16 bytes: `u16 duration, u16 flags, s16 frame, s16 jump, ...`. Flag `0x8000` jumps by `jump` entries (loops); duration 4095 means "hold". Ticker: `0x80136680`; set script: `0x80136554`.
+- **States.** `0x8016EEC4` holds one list of script pointers per character (0–10), indexed by a state id. `0x801364AC (obj, state)` / `0x80136400` start a state. Dan's list has 51 entries, many of them the same idle script; states 23/24 are the select-screen poses.
+- **Attacks** are per-character code: two tables of 11 routines at `0x8016F178` and `0x8016F1A4` (Dan: `0x80149188`, `0x8014971C`). They start states and play voices (`0x80105C4C`); projectiles and effects use a third, shared frame bank (`0x800F19C8`).
+- The scripts live in the EXE; the frame indices point into the character file's records (Dan uses records 199–251 of `PL9A`, after Akuma's).
+
+So Zangief can keep Dan's state machine and attack code, with his own list of scripts and his own frame bank. Effects that Dan's attacks spawn (Gadoken) must be suppressed or replaced for him.
