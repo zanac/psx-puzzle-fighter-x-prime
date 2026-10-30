@@ -252,3 +252,13 @@ Sound codes `0xAxx` in his animations name voices: 0x16 is the Double Lariat sho
 - **Hit pose too short.** The game puts the reaction state (6/7) back to idle after about 6 frames. When Zangief goes from a hit script back to state 0–2, `xp_zstate` now returns a short "hit tail" instead: the hit frame for 14 frames, then a jump into that idle. The record entry lists the tails (offsets 51–53) and the hit-script range (54–55); `LISTOFF` moved to 0x2F00.
 - **One-frame glitch.** Three more palette uploads: `0x8013688C` (from the player struct; now through `xp_zpal2`) and the burnt / frozen special palettes `0x80136908` / `0x80136990` (per-character tables at `0x800F9A40` / `0x800F9AA0` + `0x8016EFA0[char]`). `xp_zpal3` (code at `0x80155008`) points those at Zangief's versions: Dan's special palettes remapped to Zangief's colours by brightness, stored at bank + PALOFF + 0x200.
 - **Spinning Piledriver.** It is attack levels 2–3 (states 12/13 = 10 + strength), which only big attacks reach. Random test play rarely gets there, so the demo video forces each state.
+
+## "In trouble" voices
+
+No SPF2T character has a voice on states 1/2. Zangief now gets one, through the voice cue mechanism:
+- Dan's voice table (`0x8016EFF4`, 8 bytes: ids 25–30 for indices 1–6, then two unused zeros) gets ids 14/15 at indices 7/8. Dan's scripts never use 7/8.
+- Slots 15/16 (ids 14/15, never seen played) hold Zangief VAGs 07 (state 1) and 06 (state 2), as chosen by ear.
+- The cue sits on a first entry before the loop.
+- `xp_zstate` skips it (starts one entry later) unless the current script is his idle 0 or pinch 1 (range at list offsets 56–57). So he cries when he gets into trouble or worse, not after every hit or attack. The hit tails for states 1/2 also jump past the cue.
+
+Correction to the voice roles: Dan's script cues use voice-table indices 1–6 = ids 25–30, so slots 1, 2 and 8 are also attack / super voices (states 11, 13, 12, 14), not only "unclear" or "opponent K.O.".

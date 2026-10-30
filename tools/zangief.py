@@ -92,6 +92,12 @@ def build_anims(mdl):
     S['pinch2'] = anim([(8, 485), (8, 486)], 0)
     return S
 
+# Zangief's own voice cues (script byte 11 = index into Dan's voice table
+# 0x8016EFF4; indices 7/8 are unused by Dan and set to ids 14/15 by
+# src/zangief.asm): a cry when he gets into trouble. xp_zstate skips the cue
+# entry unless he comes from his idle (0) or the first pinch (1).
+ZG_EVENTS = {1: [(0, 0, 7)], 2: [(0, 0, 8)]}
+
 # Dan's 51 states (0x8018779C) -> Zangief animation. 23/24 are the select
 # screen poses (another bank): they stay Dan's (see xp_zstate).
 STATES = {
@@ -350,17 +356,19 @@ def build(pac, mdl, first, template, exe, sheet=None):
     # leaving a hit for idle 0-2 goes through a short hit tail).
     devents = dan_events(exe)
     scripts, where, per_state = bytearray(), {}, {}
-    base = LISTOFF + 4 * (N_STATES + 5)
+    base = LISTOFF + 4 * (N_STATES + 7)
     HITS = ('hit', 'hit2', 'hitloop')
-    order = [st for st in range(N_STATES) if STATES[st] in HITS] + \
-            [st for st in range(N_STATES) if STATES[st] not in HITS]
-    hit_hi = None
+    order = [st for st in range(N_STATES) if STATES[st] in HITS] + [0, 1] + \
+            [st for st in range(N_STATES) if STATES[st] not in HITS and st not in (0, 1)]
+    hit_hi = calm_hi = None
     for st in order:
         if hit_hi is None and STATES[st] not in HITS:
             hit_hi = base + len(scripts)
+        if calm_hi is None and st not in (0, 1) and STATES[st] not in HITS:
+            calm_hi = base + len(scripts)
         name = STATES[st]
         ents, loop = used[name]
-        ents, loop, sig = place(ents, loop, devents[st])
+        ents, loop, sig = place(ents, loop, devents[st] + ZG_EVENTS.get(st, []))
         key2 = (name, sig)
         if key2 not in where:
             where[key2] = base + len(scripts)
@@ -382,12 +390,14 @@ def build(pac, mdl, first, template, exe, sheet=None):
         t0 = base + len(scripts)
         tails.append(t0)
         scripts += struct.pack('<HHhh', 14, 0, index[(43, 0)], 0) + bytes([0, 0, 0, 0, 0, 0, 3, 0])
-        jump = (per_state[st] - (t0 + 16)) // 16
-        assert (per_state[st] - (t0 + 16)) % 16 == 0
+        target = per_state[st] + (16 if st in ZG_EVENTS else 0)    # skip the cue
+        jump = (target - (t0 + 16)) // 16
+        assert (target - (t0 + 16)) % 16 == 0
         scripts += struct.pack('<HHhh', 6, 0x8000, index[(42, 0)], jump) + bytes([0, 0, 0, 0, 0, 0, 3, 0])
     lst = b''.join(struct.pack('<I', per_state[s]) for s in range(N_STATES))
     lst += b''.join(struct.pack('<I', t) for t in tails)
     lst += struct.pack('<II', base, hit_hi)
+    lst += struct.pack('<II', hit_hi, calm_hi)          # idle 0 + pinch 1 scripts
     e1 = bytearray(b''.join(recs))
     e1 += bytes(PALOFF - len(e1)) + pals
     e1 += bytes(LISTOFF - len(e1)) + lst + scripts
@@ -424,7 +434,8 @@ VOICE_MAP = {   # Dan VAG slot (1-24) -> Zangief VAG (SE0AA, 1-31)
     6: 13, 7: 10,
     8: 21,      # opponent knocked out (id 27): his taunt line
     9: 4,       # win (id 28)
-    10: 15, 11: 11, 12: 16, 13: 18, 14: 14, 15: 19, 16: 20,
+    10: 15, 11: 11, 12: 16, 13: 18, 14: 14,
+    15: 7, 16: 6,   # in trouble 1 / 2 (ids 14/15, ZG_EVENTS)
     17: 17,     # bear
     18: 24,
     19: 23,     # attack (id 33): Double Lariat shout

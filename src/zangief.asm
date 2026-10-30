@@ -347,48 +347,34 @@ xp_zstate:
 	nop
 	addu    t9, t9, v1              ; hit scripts start
 	sltu    at, t8, t9
-	bnez    at, @@ret
+	bnez    at, @@calm
 	lw      t9, ZG_LISTOFF + 55 * 4(v1)
 	nop
 	addu    t9, t9, v1              ; hit scripts end
 	sltu    at, t8, t9
-	beqz    at, @@ret
+	beqz    at, @@calm
 	addu    t9, v1, a1
 	lw      t9, ZG_LISTOFF + 51 * 4(t9)     ; hit tail for this state
-	nop
+	b       @@ret
 	addu    s0, v1, t9
+@@calm:                                 ; states 1/2 start with a voice cue:
+	beqz    a1, @@ret               ; only from idle 0 / pinch 1
+	lw      t9, ZG_LISTOFF + 56 * 4(v1)
+	nop
+	addu    t9, t9, v1
+	sltu    at, t8, t9
+	bnez    at, @@skip
+	lw      t9, ZG_LISTOFF + 57 * 4(v1)
+	nop
+	addu    t9, t9, v1
+	sltu    at, t8, t9
+	bnez    at, @@ret
+	nop
+@@skip:
+	addiu   s0, s0, 16
 @@ret:
 	jr      ra
 	nop
-
-; palette upload (0x80136860, in 0x80136824): a0 = object, v1 = palette
-; pool 0x800F8440. Out: a0 = source of the 4 palettes. Leaf; keeps a1-a3.
-xp_zpal:
-	lb      v0, 0x74(a0)
-	lb      t9, 0x79(a0)            ; colour set
-	lb      t8, 0x73(a0)            ; side
-	sll     t9, t9, 7
-	li      at, ZG_CHAR
-	bne     v0, at, @@vanilla
-	li      at, 1
-	sllv    at, at, t8
-	lui     a0, hi(XP_ZBITS)
-	lbu     a0, lo(XP_ZBITS)(a0)
-	nop
-	and     at, at, a0
-	beqz    at, @@vanilla
-	li      a0, BANK_P1 + ZG_PALOFF
-	beqz    t8, @@zg
-	nop
-	li      a0, BANK_P2 + ZG_PALOFF
-@@zg:
-	jr      ra
-	addu    a0, a0, t9
-@@vanilla:
-	sll     v0, v0, 9
-	addu    a0, v0, t9
-	jr      ra
-	addu    a0, a0, v1
 
 .endarea
 
@@ -482,6 +468,36 @@ xp_zpal2:
 ; code space: 0x80155008, a 340-byte function with no references that never runs
 .org 0x80155008
 .area 0x154, 0
+; palette upload (0x80136860, in 0x80136824): a0 = object, v1 = palette
+; pool 0x800F8440. Out: a0 = source of the 4 palettes. Leaf; keeps a1-a3.
+xp_zpal:
+	lb      v0, 0x74(a0)
+	lb      t9, 0x79(a0)            ; colour set
+	lb      t8, 0x73(a0)            ; side
+	sll     t9, t9, 7
+	li      at, ZG_CHAR
+	bne     v0, at, @@vanilla
+	li      at, 1
+	sllv    at, at, t8
+	lui     a0, hi(XP_ZBITS)
+	lbu     a0, lo(XP_ZBITS)(a0)
+	nop
+	and     at, at, a0
+	beqz    at, @@vanilla
+	li      a0, BANK_P1 + ZG_PALOFF
+	beqz    t8, @@zg
+	nop
+	li      a0, BANK_P2 + ZG_PALOFF
+@@zg:
+	jr      ra
+	addu    a0, a0, t9
+@@vanilla:
+	sll     v0, v0, 9
+	addu    a0, v0, t9
+	jr      ra
+	addu    a0, a0, v1
+
+
 ; special palettes (0x80136908 burnt, 0x80136990 frozen): wraps their
 ; "jal 0x80108C68". v1 = object, a0 = vanilla source (char 10: burnt
 ; 0x800FA8C0, frozen 0x800FA920). Zangief's are in his bank at PALOFF+0x200.
@@ -551,4 +567,6 @@ xp_zpal3:
 	jal     xp_zpal3
 .org 0x80136A00
 	jal     xp_zpal3
+.org 0x8016EFFA                         ; Dan's voice table, unused indices 7/8
+	.byte   14, 15                  ; Zangief's "in trouble" cries (ZG_EVENTS)
 .endif
