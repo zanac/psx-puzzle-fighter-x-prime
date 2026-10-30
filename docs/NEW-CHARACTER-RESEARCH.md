@@ -245,3 +245,10 @@ Sound codes `0xAxx` in his animations name voices: 0x16 is the Double Lariat sho
 
 - **Round 2 sprite.** Between rounds, `0x80107430` re-uploads both players' palettes straight from the player structs (character + 0x6D colour set). Zangief got Dan's palette there. `xp_zpal2` wraps its two `jal 0x80108C68` calls.
 - **Missing voices (super, K.O., win, raised hands).** These are script cues, not code. Script byte 11 is a voice index: `0x80136554` plays entry byte11 − 1 of the character's voice table at `0x8016EFFC`. `tools/zangief.py` now reads Dan's scripts from the EXE and puts each cue (and flag bit 0) on the Zangief entry playing at the same moment. A looping body is unrolled up to the last cue, so a cue never repeats unless Dan's does. Win sequence now: 30 (super), 27 (K.O.), 28 (win), 29, and the win pose's own voice.
+
+## Second round of fixes
+
+- **Pinch states.** States 1 and 2 are the "in trouble" idles: Dan uses his normal idle there, the other characters do not. Zangief: state 1 struggles (Pocket Fighter animation at entry 195, frames 94–96), state 2 cries out (frames 485/486).
+- **Hit pose too short.** The game puts the reaction state (6/7) back to idle after about 6 frames. When Zangief goes from a hit script back to state 0–2, `xp_zstate` now returns a short "hit tail" instead: the hit frame for 14 frames, then a jump into that idle. The record entry lists the tails (offsets 51–53) and the hit-script range (54–55); `LISTOFF` moved to 0x2F00.
+- **One-frame glitch.** Three more palette uploads: `0x8013688C` (from the player struct; now through `xp_zpal2`) and the burnt / frozen special palettes `0x80136908` / `0x80136990` (per-character tables at `0x800F9A40` / `0x800F9AA0` + `0x8016EFA0[char]`). `xp_zpal3` (code at `0x80155008`) points those at Zangief's versions: Dan's special palettes remapped to Zangief's colours by brightness, stored at bank + PALOFF + 0x200.
+- **Spinning Piledriver.** It is attack levels 2–3 (states 12/13 = 10 + strength), which only big attacks reach. Random test play rarely gets there, so the demo video forces each state.

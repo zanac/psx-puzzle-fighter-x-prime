@@ -267,7 +267,7 @@ XP_ZBITS:
 ZG_FILE   equ 0x56              ; first file of XP_NEWFILES (build.sh)
 ZG_GROUP  equ 11                ; "loaded file" cache value for Zangief
 ZG_PALOFF equ 0x2C00            ; tools/zangief.py PALOFF
-ZG_LISTOFF equ 0x2E00           ; tools/zangief.py LISTOFF
+ZG_LISTOFF equ 0x2F00           ; tools/zangief.py LISTOFF
 BANK_P1   equ 0x800E7600
 BANK_P2   equ 0x800EBB00
 
@@ -338,6 +338,23 @@ xp_zstate:
 @@bank:
 	addu    t9, v1, a1
 	lw      t9, ZG_LISTOFF(t9)
+	nop
+	addu    s0, v1, t9
+	sltiu   at, a1, 3 * 4           ; states 0-2: coming from a hit?
+	beqz    at, @@ret
+	lw      t8, 0x28(s1)            ; current script
+	lw      t9, ZG_LISTOFF + 54 * 4(v1)
+	nop
+	addu    t9, t9, v1              ; hit scripts start
+	sltu    at, t8, t9
+	bnez    at, @@ret
+	lw      t9, ZG_LISTOFF + 55 * 4(v1)
+	nop
+	addu    t9, t9, v1              ; hit scripts end
+	sltu    at, t8, t9
+	beqz    at, @@ret
+	addu    t9, v1, a1
+	lw      t9, ZG_LISTOFF + 51 * 4(t9)     ; hit tail for this state
 	nop
 	addu    s0, v1, t9
 @@ret:
@@ -462,6 +479,41 @@ xp_zpal2:
 	nop
 .endarea
 
+; code space: 0x80155008, a 340-byte function with no references that never runs
+.org 0x80155008
+.area 0x154, 0
+; special palettes (0x80136908 burnt, 0x80136990 frozen): wraps their
+; "jal 0x80108C68". v1 = object, a0 = vanilla source (char 10: burnt
+; 0x800FA8C0, frozen 0x800FA920). Zangief's are in his bank at PALOFF+0x200.
+xp_zpal3:
+	lb      v0, 0x74(v1)
+	li      at, ZG_CHAR
+	bne     v0, at, @@go
+	lb      t8, 0x73(v1)
+	li      at, 1
+	sllv    at, at, t8
+	lui     v0, hi(XP_ZBITS)
+	lbu     v0, lo(XP_ZBITS)(v0)
+	nop
+	and     v0, v0, at
+	beqz    v0, @@go
+	li      t9, 0x800FA920
+	li      v0, 0
+	bne     a0, t9, @@side
+	nop
+	li      v0, 0x60
+@@side:
+	li      a0, BANK_P1 + ZG_PALOFF + 0x200
+	beqz    t8, @@add
+	nop
+	li      a0, BANK_P2 + ZG_PALOFF + 0x200
+@@add:
+	addu    a0, a0, v0
+@@go:
+	j       0x80108C68
+	nop
+.endarea
+
 ; hooks only when the build has Zangief's file (XP_PF in build.sh);
 ; otherwise he keeps Dan's in-match look
 .if ZG_HAVE
@@ -493,4 +545,10 @@ xp_zpal2:
 	jal     xp_zpal2
 .org 0x8010749C
 	jal     xp_zpal2
+.org 0x801368F0
+	jal     xp_zpal2                ; palette from the player struct
+.org 0x80136978
+	jal     xp_zpal3
+.org 0x80136A00
+	jal     xp_zpal3
 .endif

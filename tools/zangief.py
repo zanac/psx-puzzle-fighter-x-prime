@@ -15,7 +15,9 @@ Output: an SPF2T character file with the usual two entries.
            +PALOFF  palette block: 4 colour sets x 4 palettes (palette 0 =
                     Zangief, 1-3 = Dan's effect palettes), like FIRST.EMI's
                     per-character blocks (see xp_zpal in src/zangief.asm)
-           +LISTOFF 51 state offsets (relative to the bank), then the
+           +0x200   burnt and frozen special palettes (3 each, see xp_zpal3)
+           +LISTOFF 51 state offsets (relative to the bank), 3 hit-tail
+                    offsets (states 0-2), the hit-script range, then the
                     16-byte animation scripts (see xp_zstate)
 
 Frames: Pocket Fighter records are composited (costume overlays: a record with
@@ -34,11 +36,12 @@ import lzh
 
 SCALE = 0.65
 PALOFF = 0x2C00             # must match src/zangief.asm
-LISTOFF = 0x2E00
+LISTOFF = 0x2F00
 BANK_MAX = 0x4500
 N_STATES = 51
 MDL_ANIM = 0x565C           # Zangief's animation array in PL09A.MDL
 DAN_PALS = 0x61C00          # Dan's palette block in FIRST.EMI (0x800F9840)
+DAN_SPECIAL = 0x62C80       # Dan's burnt palettes (0x800F9A40 + 0xE80); frozen at +0x60
 
 # --- Pocket Fighter animations used (start entry in the MDL array) ---------
 PF = dict(idle=1, hit=111, hit2=121, ko=127, bear=150, taunt=166, punch=225,
@@ -84,12 +87,15 @@ def build_anims(mdl):
     bear = a['bear']                       # walk in the skin, burst, pose
     S['bear'] = anim(bear[:3] * 3 + bear[3:7] + [(6, 337), (8, 338)], 3 * 3 + 4)
     S['hitloop'] = anim([(4, 42), (4, 43)], 0)
+    # pinch (field filling up): struggling, then crying out
+    S['pinch1'] = anim(pf_anim(mdl, 195), 0)                # frames 94-96
+    S['pinch2'] = anim([(8, 485), (8, 486)], 0)
     return S
 
 # Dan's 51 states (0x8018779C) -> Zangief animation. 23/24 are the select
 # screen poses (another bank): they stay Dan's (see xp_zstate).
 STATES = {
-    0: 'idle', 1: 'idle', 2: 'idle', 37: 'idle', **{s: 'idle' for s in range(43, 51)},
+    0: 'idle', 1: 'pinch1', 2: 'pinch2', 37: 'idle', **{s: 'idle' for s in range(43, 51)},
     **{s: 'still' for s in range(17, 23)},
     3: 'flex', 36: 'flex', 16: 'flex', 39: 'flex',
     # win poses, picked at random by Dan's code (tables 0x80171C18/20)
@@ -326,11 +332,32 @@ def build(pac, mdl, first, template, exe, sheet=None):
         c = recolour(cols, mode) if mode else cols
         pals += struct.pack('<16H', 0, *[bgr555(x) for x in c])
         pals += dan[s * 0x80 + 0x20:s * 0x80 + 0x80]
-    # scripts: one per (animation, Dan's events of the state)
+    # special palettes (burnt / frozen, 0x80136908 / 0x80136990): Dan's
+    # versions remapped to Zangief's colours by brightness
+    lum = lambda c: c[0] * 3 + c[1] * 6 + c[2]
+    def unpal(b):
+        return [((v & 31) << 3, (v >> 5 & 31) << 3, (v >> 10 & 31) << 3) for v in struct.unpack('<16H', b)]
+    dnorm = unpal(first[DAN_PALS + 0x80:DAN_PALS + 0xA0])
+    for off in (DAN_SPECIAL, DAN_SPECIAL + 0x60):
+        dsp = unpal(first[off:off + 0x20])
+        pairs = sorted((lum(dnorm[i]), dsp[i]) for i in range(1, 16))
+        z = [min(pairs, key=lambda p: abs(p[0] - lum(c)))[1] for c in cols]
+        pals += struct.pack('<16H', 0, *[bgr555(x) for x in z])
+        pals += first[off + 0x20:off + 0x60]
+    assert len(pals) <= LISTOFF - PALOFF
+    # scripts: one per (animation, Dan's events of the state). The hit
+    # reactions come first, so their range can be told apart (see xp_zstate:
+    # leaving a hit for idle 0-2 goes through a short hit tail).
     devents = dan_events(exe)
     scripts, where, per_state = bytearray(), {}, {}
-    base = LISTOFF + 4 * N_STATES
-    for st in range(N_STATES):
+    base = LISTOFF + 4 * (N_STATES + 5)
+    HITS = ('hit', 'hit2', 'hitloop')
+    order = [st for st in range(N_STATES) if STATES[st] in HITS] + \
+            [st for st in range(N_STATES) if STATES[st] not in HITS]
+    hit_hi = None
+    for st in order:
+        if hit_hi is None and STATES[st] not in HITS:
+            hit_hi = base + len(scripts)
         name = STATES[st]
         ents, loop = used[name]
         ents, loop, sig = place(ents, loop, devents[st])
@@ -349,7 +376,18 @@ def build(pac, mdl, first, template, exe, sheet=None):
                 scripts += struct.pack('<HHhh', dur, flags, index[key], jump)
                 scripts += bytes([0, 0, 0, v, 0, 0, 4 if name == 'still' else 3, 0])
         per_state[st] = where[key2]
+    # hit tails for states 0-2: hold the hit pose a little, then the idle
+    tails = []
+    for st in range(3):
+        t0 = base + len(scripts)
+        tails.append(t0)
+        scripts += struct.pack('<HHhh', 14, 0, index[(43, 0)], 0) + bytes([0, 0, 0, 0, 0, 0, 3, 0])
+        jump = (per_state[st] - (t0 + 16)) // 16
+        assert (per_state[st] - (t0 + 16)) % 16 == 0
+        scripts += struct.pack('<HHhh', 6, 0x8000, index[(42, 0)], jump) + bytes([0, 0, 0, 0, 0, 0, 3, 0])
     lst = b''.join(struct.pack('<I', per_state[s]) for s in range(N_STATES))
+    lst += b''.join(struct.pack('<I', t) for t in tails)
+    lst += struct.pack('<II', base, hit_hi)
     e1 = bytearray(b''.join(recs))
     e1 += bytes(PALOFF - len(e1)) + pals
     e1 += bytes(LISTOFF - len(e1)) + lst + scripts
