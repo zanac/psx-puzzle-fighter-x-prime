@@ -134,7 +134,7 @@ Branch: `experimental/new-character`. Status: **steps 0–6 done; step 7 (Arcade
 - Ending: SPF2T has no character endings. It is a staff roll with the player's character beside the credits, plus wordless vignettes from one of 4 random sets. Zangief gets the same.
 - Still to do:
   - his figure in the staff roll and the vignettes (now Dan's, with Zangief's colours);
-  - the hard-difficulty ending (`HARD_END.EMI`).
+  - optionally, Zangief in the HARD finale, where the cast gathers under the CAPCOM logo (`HARD_END.EMI`).
 
 ### Step 8: packaging
 

@@ -505,7 +505,14 @@ Seen in the emulator with a forced win in every match. The RAM pokes are below; 
   - The vignette set is one of `ENDING00`–`03.EMI` (file ids `0x12`–`0x15`), chosen at random: `0x801247B4() & 3` → `0x8019377E` → table `0x8017173C`. It is loaded over the P1 sprite banks (`0x80024000` / `0x80035000`).
   - Each file has 9 sprite sets (graphics + 44-byte records, as `PLxx_OBJ`): 8 sets of characters, and one of large pieces (the staff-roll figures).
   - There are no story texts.
-  - `HARD_END.EMI` (file `0x18`, one set of 242 records) is loaded by `0x80144674`: a special ending, to be studied.
+  - **Levels.** `0x801BAACF` holds the level chosen in LEVEL SELECT: 0 EASY, 1 NORMAL, 2 HARD. The three cases were checked by playing them through on the original game:
+    - EASY has 3 stages, then GAME OVER with "TRY NORMAL LEVEL!": no ending.
+    - NORMAL ends with the staff roll, then "THANK YOU FOR PLAYING / PRESENTED BY CAPCOM" on black.
+    - HARD has the same staff roll, then the extra ending:
+      - after the last credits page, state `+0x18` goes to 10 instead of 12 (`0x80143D94`; any level other than NORMAL);
+      - `0x80143FC4` → `0x80144638` loads `HARD_END.EMI` (file `0x18`) over the P1 sprite banks and plays song 4;
+      - on the "THANK YOU" screen the whole cast (the 12 characters) walks in and gathers under the CAPCOM logo;
+      - then GAME OVER.
 - **Gallery.** `IMG00`–`IMG20.EMI` are TIM images (8bpp): the gallery (title art, flyers, character art). They are not endings.
 
 ### Changes
@@ -532,4 +539,4 @@ Seen in the emulator with a forced win in every match. The RAM pokes are below; 
 ### Still to do
 
 - **Staff roll.** It shows Dan's small figure in Zangief's colours, and the vignettes use Dan as well. A Zangief figure needs the ending sets: a Zangief variant of the `ENDING` files, or patching them after loading.
-- **`HARD_END`:** when it plays, and whether it has per-character parts.
+- **`HARD_END`.** Zangief on HARD reaches it without problems (tested). It shows the original 12 characters, so Zangief is not among them; adding him would mean extending its sprite set.
