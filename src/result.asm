@@ -280,5 +280,9 @@ xp_rs_line:                             ; line: the regulars as vanilla, then
 	ori     a1, zero, 0x19
 .org 0x80138CD0
 	ori     a1, zero, 0x1B
+.org 0x801387AC
+	ori     a1, zero, 0x1B              ; CLEAR RESULT's YES / NO prompt (YES)
+.org 0x801387C8
+	ori     a1, zero, 0x1B              ; (NO)
 .org 0x801387F4
-	ori     a1, zero, 0x1B              ; the line that clears the menu row
+	ori     a1, zero, 0x1B              ; the line that clears the prompt

@@ -152,18 +152,20 @@ xp_cursorchars:                         ; CURSOR_CHARS + positions 8, 9
 .align 4
 
 ; spawn (end of 0x8013C29C, s0 = mode, its frame still on the stack): the
-; two extra icons on the Versus / Arcade select screen (mode 3)
+; two extra icons on the Versus / Arcade select screens
 xp_icons:
-	lui     v0, hi(XP_ZOK)             ; Versus / Arcade, Arcade challenge included
+	lui     v0, hi(XP_ZOK)
 	lbu     at, lo(XP_ZOK)(v0)
 	lbu     v0, lo(XP_ZOKN)(v0)
-	nop
-	or      v0, v0, at
 	li      v1, 3
-	bne     v0, v1, @@ret
+	beq     v0, v1, @@make          ; select screen of a Versus / Arcade game
+	nop                             ; (also re-made, mode 1, when P2 joins it)
+	bne     at, v1, @@ret           ; an Arcade challenge's select (MODE_NEXT 0):
+	nop                             ; mode 3 only, not the STAGE screen's "?"
+	bne     s0, v1, @@ret           ; cards (mode 1, MODE_NEXT 0 too)
 	nop
-	bne     s0, v1, @@ret           ; mode 3 only: the select screen (mode 1 is
-	li      a0, 8                   ; Arcade's STAGE screen, its "?" cards)
+@@make:
+	li      a0, 8
 	jal     0x80114260
 	move    a1, s0
 	li      a0, 9

@@ -1207,8 +1207,9 @@ XP_ZSEL:
 ; ============================================================================
 ; ARCADE (step 7)
 ; xp_frame (every frame, from the main loop's call of the loader step
-; 0x8010436C): XP_ZOK = 3 if MODE is Versus (3) or Arcade (1, not Street
-; Puzzle: XP_STREET), else 0; XP_ZOKN the same for MODE_NEXT. The Zangief
+; 0x8010436C): XP_ZOK = 3 if MODE is Versus (3) or Arcade (1, or 2 when
+; the game is P2's, e.g. a challenger who won; not Street Puzzle:
+; XP_STREET), else 0; XP_ZOKN the same for MODE_NEXT. The Zangief
 ; tests read these instead of the mode, so they hold in both modes.
 ; Code space: 0x8010868C-0x80108924, six functions with no references that
 ; never run (coverage: boot, menus, Versus, a whole Arcade run with its
@@ -1231,8 +1232,9 @@ xp_frame:
 	li      t7, 2
 @@loop:
 	beq     t6, t5, @@ok
-	li      t8, 1
-	bne     t6, t8, @@no
+	addiu   t8, t6, -1
+	sltiu   t8, t8, 2               ; Arcade: 1 (P1's game) or 2 (P2's game)
+	beqz    t8, @@no
 	nop
 	beqz    t3, @@ok                ; Arcade, not Street Puzzle
 	nop
@@ -1283,8 +1285,9 @@ xp_zcpu:
 	lui     t0, hi(MODE)
 	lbu     t1, lo(MODE)(t0)
 	lbu     t2, lo(XP_STREET)(t0)
-	li      t3, 1
-	bne     t1, t3, @@ret           ; Arcade only
+	addiu   t3, t1, -1
+	sltiu   t3, t3, 2               ; Arcade only (MODE 1, or 2: P2's game)
+	beqz    t3, @@ret
 	nop
 	bnez    t2, @@ret
 	lbu     t2, 0x6C(a2)            ; 1 = played by the CPU
