@@ -160,7 +160,7 @@ xp_stage:
 	lbu     t0, lo(MODE)(t0)
 	li      t1, 3
 	la      t2, xp_stg_setting
-	bne     t0, t1, @@last          ; not Versus: vanilla
+	bne     t0, t1, @@arc               ; not Versus
 	lbu     t1, 0(t2)
 	nop
 	bnez    t1, @@set
@@ -171,6 +171,20 @@ xp_stage:
 	b       @@last
 	move    v0, t7
 .else
+	b       @@last
+	nop
+.endif
+.if ZG_HAVE
+@@arc:                                  ; Arcade: the CPU's stage; Zangief's own
+	li      t3, ZG_CHAR
+	bne     v0, t3, @@last
+	nop
+	jal     xp_zchar
+	move    t6, s2
+	b       @@last
+	move    v0, t7
+.else
+@@arc:
 	b       @@last
 	nop
 .endif

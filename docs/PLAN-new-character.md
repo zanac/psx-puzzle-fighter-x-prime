@@ -1,11 +1,11 @@
 # Plan: Zangief from Pocket Fighter as a hidden character
 
-Branch: `experimental/new-character`. Status: **steps 0–6 done**; findings in [NEW-CHARACTER-RESEARCH.md](NEW-CHARACTER-RESEARCH.md).
+Branch: `experimental/new-character`. Status: **steps 0–6 done; step 7 (Arcade) in progress**; findings in [NEW-CHARACTER-RESEARCH.md](NEW-CHARACTER-RESEARCH.md).
 
 ## Decisions (agreed)
 
 - Only the NTSC-U Pocket Fighter (SLUS-00653) is supported.
-- No Arcade and no ending: Zangief is **not selectable in Arcade**, only in Versus.
+- ~~No Arcade~~ (changed on 2026-10-30): Zangief plays **Arcade** too, with his own opponent order (Felicia, his Pocket Fighter rival, as the 8th opponent) and the standard SPF2T ending. He also appears as a CPU challenger in the others' Arcade runs (in place of Dan, one time in two). No Pocket Fighter intro, and no dialogue (SPF2T has none).
 - **Option B** (alternate on an existing slot) is fine, provided it covers everything, his own stage background and music included.
 - **Host slot: Dan.** Zangief is Dan (10) plus his own alternate bit. Whatever is not overridden (for example the RESULT row) counts as Dan.
 - **Drop pattern and rates: "Siberian Bear".** 3×2 blocks of the four colours (rows from the top: RRRBBB, RRRBBB, GGGYYY, GGGYYY): big Power Gems come easily, chains are hard. He sends 90 % and receives 90 %: slow but armoured.
@@ -126,9 +126,15 @@ Branch: `experimental/new-character`. Status: **steps 0–6 done**; findings in 
 - Convert Zangief's Pocket Fighter stage to the SPF2T stage format. The stage selector gets a ZANGIEF entry.
 - Put his theme in a new XA file and point the stage's music at it.
 
-### Step 7: Arcade lock-out
+### Step 7: Arcade
 
-- Zangief cannot be picked in Arcade (the Down cycle skips him there). No ending, no Arcade order. Street Puzzle is not affected.
+- Zangief can be picked in Arcade; Street Puzzle is not affected.
+- His order: Felicia, his rival, is the 8th opponent, before Dan and the bosses.
+- CPU challenger: in another character's run, Zangief comes in place of Dan (the 9th opponent) one time in two.
+- Ending: SPF2T has no character endings. It is a staff roll with the player's character beside the credits, plus wordless vignettes from one of 4 random sets. Zangief gets the same.
+- Still to do:
+  - his figure in the staff roll and the vignettes (now Dan's, with Zangief's colours);
+  - the hard-difficulty ending (`HARD_END.EMI`).
 
 ### Step 8: packaging
 

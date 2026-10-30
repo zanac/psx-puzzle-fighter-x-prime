@@ -486,3 +486,50 @@ Seen in the emulator with a forced win in every match. The RAM pokes are below; 
   - Coverage was redone on the original disc over a whole Arcade run (10 opponents, ending, staff roll), Street Puzzle and the option menus. None of the code areas this project uses runs there.
 - **New regression check.** `tools/regress.py` now plays Arcade with P1 winning every match. It must reach 4 different opponents (`arcade_ok`).
 - **Original Arcade order with Ryu,** as seen in that run: Morrigan, Sakura, Hsien-Ko, Ken, Felicia, Chun-Li, Donovan, Ryu, Dan, Akuma (the opponents vary with the random seed).
+
+## Step 7: Arcade
+
+### How the Arcade works (original game)
+
+- **Level select.** It comes before the character select: EASY, NORMAL ("8 stages") or HARD.
+- **Opponent order.**
+  - `0x8012CD18` copies 16 bytes from `0x8016D49C + [state + 0x37]` to `0x8019F45C`. There are 8 rows: each lists the 8 regular characters (the player's own included: there is a mirror match), then Dan (10).
+  - It may then put Devilot (8) or Dan in place 6 (flags at state `+0x45` / `+0x47`) and Akuma (9) in place 8 (`+0x46`).
+  - The next opponent is the first one of the list that is not in the beaten mask (state `+0x10`). It is chosen by `0x8012CBCC` (first match, char stored at `0x8012CCD4`) or by the next-opponent code (stored in the delay slot of `0x8012CEB8`). Both then call `0x8012CDBC` with a2 = the CPU's player struct.
+- **Modes.**
+  - Arcade and Street Puzzle are both `MODE` 1 in a match; `0x8019C3F5` is 1 in Street Puzzle.
+  - On the select screen `MODE_NEXT` is 1 for both, and 3 in Versus.
+  - Player struct `+0x6C` is 1 for a CPU player.
+- **Ending.**
+  - After the last win comes a staff roll: the player's character stands beside the credits, alternating with wordless vignettes of chibi characters.
+  - The vignette set is one of `ENDING00`–`03.EMI` (file ids `0x12`–`0x15`), chosen at random: `0x801247B4() & 3` → `0x8019377E` → table `0x8017173C`. It is loaded over the P1 sprite banks (`0x80024000` / `0x80035000`).
+  - Each file has 9 sprite sets (graphics + 44-byte records, as `PLxx_OBJ`): 8 sets of characters, and one of large pieces (the staff-roll figures).
+  - There are no story texts.
+  - `HARD_END.EMI` (file `0x18`, one set of 242 records) is loaded by `0x80144674`: a special ending, to be studied.
+- **Gallery.** `IMG00`–`IMG20.EMI` are TIM images (8bpp): the gallery (title art, flyers, character art). They are not endings.
+
+### Changes
+
+- **Mode tests.**
+  - `xp_frame` runs every frame, hooked on the main loop's call of the loader step at `0x80102458`.
+  - It sets `XP_ZOK` / `XP_ZOKN` to 3 when `MODE` / `MODE_NEXT` is Versus or Arcade (Street Puzzle excluded).
+  - All the Zangief tests read these bytes instead of the mode, so they hold in Arcade too: selection, sprites, voices, portraits, HUD, WINNER screen and damage.
+- **CPU challenger.** `xp_zopp1` / `xp_zopp2` → `xp_zcpu` sets the CPU struct's Zangief bit:
+  - when the opponent is Dan, one time in two (bit 0 of root counter 0);
+  - not when the player is Zangief;
+  - only for a CPU player (`+0x6C`).
+
+  Any other opponent clears the bit. The castle stage follows (`xp_stage`'s Arcade path).
+- **His order.** `xp_zorder` is hooked on the `jr ra` of `0x8012CD18`. When a player is Zangief, it swaps Felicia (6) into place 7 of the list: the 8th opponent.
+- **Code space.** `0x8010868C`–`0x80108924`: six unreferenced functions that never run. This was checked against:
+  - a static reference scan (`jal` / `j` / branches from outside, data pointers, `lui` + `addiu` / `ori` pairs);
+  - coverage over Versus, a whole Arcade run, Street Puzzle, options and the demo;
+  - a scan of the `DATA` files for pointers.
+- **Tests.** `tools/regress.py`:
+  - `arcade_ok`: Ryu's Arcade reaches 4 opponents;
+  - `arcade_z_ok`: Zangief's whole run, with Felicia 8th, then Dan and the bosses, up to the staff roll.
+
+### Still to do
+
+- **Staff roll.** It shows Dan's small figure in Zangief's colours, and the vignettes use Dan as well. A Zangief figure needs the ending sets: a Zangief variant of the `ENDING` files, or patching them after loading.
+- **`HARD_END`:** when it plays, and whether it has per-character parts.

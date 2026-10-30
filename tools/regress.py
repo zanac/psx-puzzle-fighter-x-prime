@@ -3,7 +3,8 @@ from nav import *
 from model import xprime
 """End-to-end regression: title, select (secret cycle), damage fuzz against
 model.py, match end + RESULT, Arcade with Devilot (P1 wins every match: it
-must reach 4 different opponents, arcade_ok), Street Puzzle, demo.
+must reach 4 different opponents, arcade_ok), Arcade as Zangief (Felicia
+8th, then Dan and the bosses: arcade_z_ok, needs XP_PF), Street Puzzle, demo.
 
 usage: regress.py IMAGE.(pbp|cue) OUTDIR
 Writes screenshots, savestates and result.json into OUTDIR."""
@@ -73,6 +74,26 @@ for k in range(200):
 sh('arcade_late')
 R['arcade_opponents']=opp
 R['arcade_ok']=len(opp)>=4
+# Arcade as Zangief (Down x7 from Ryu: ... Anita, Zangief): a whole run.
+# With Zangief's assets (XP_PF) Felicia must be his 8th opponent, before
+# Dan (10) and the bosses; the run must reach the ending (staff roll).
+e.load_state(P_('st_menu.state'))
+e.press(lr.CROSS,6,200); e.press(lr.CROSS,6,200)
+for i in range(7): e.press(lr.DOWN,4,20)
+R['arcade_z_sel']=e.r8(0x801baac4)
+e.press(lr.CROSS,6,30)
+opp=[]; zp1=False
+for k in range(260):
+    for f in range(60): e.w16(0x801ae500+0x22a,250); e.run(1)
+    e.press(lr.CROSS,4,4)
+    c=e.r8(0x801ae814)
+    if e.r8(0x8019c40f)==1:
+        zp1 = zp1 or e.r8(0x801ae568)==10
+        if not opp or opp[-1]!=c: opp.append(c)
+    if 9 in opp and len(opp)>=10: break
+sh('arcade_zangief')
+R['arcade_z_opponents']=opp
+R['arcade_z_ok']=zp1 and len(opp)>=10 and opp[7]==6 and opp[8]==10
 # street puzzle
 e.load_state(P_('st_menu.state'))
 e.press(lr.DOWN,8,30); e.press(lr.CROSS,6,250); e.press(lr.CROSS,6,400); e.run(300); sh('street')

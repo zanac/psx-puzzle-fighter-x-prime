@@ -1,10 +1,12 @@
 ; ============================================================================
-; ZANGIEF (hidden character, Versus only)
+; ZANGIEF (hidden character, Versus and Arcade)
 ; Zangief is Dan's slot (10) plus his own per-player bit in XP_ZBITS, the
 ; same way Mei-Ling / Anita are Hsien-Ko / Donovan plus a bit. He is only
-; real in Versus: every test also checks the game mode.
+; real in Versus and Arcade: every test also checks the game mode, through
+; XP_ZOK / XP_ZOKN (3 when MODE / MODE_NEXT is Versus or Arcade, set every
+; frame by xp_frame; Street Puzzle, which is MODE 1 as Arcade, is excluded).
 ;   select:  Down cycles ... Mei-Ling -> Anita -> Zangief -> cell character,
-;            Up walks back (Zangief -> Anita); Arcade skips him
+;            Up walks back (Zangief -> Anita)
 ;   pattern: "Siberian Bear" (XP_ZPATTERN), via the pattern lookup 0x801350E4
 ;   damage:  index 11 in DMGTAB (send 90 %, receive 90 %), via xp_zchar
 ; Code space: 0x80163CDC, a 684-byte function with no references that never
@@ -23,11 +25,11 @@ ZG_XA_LEN equ 3376              ; its sectors
 .org 0x80163CDC
 .area 684, 0
 
-; xp_zbit: v1 = this player's Zangief bit if the mode is Versus, else 0.
+; xp_zbit: v1 = this player's Zangief bit in Versus / Arcade, else 0.
 ; In: t5 = player bit. Leaf, v1 only.
 xp_zbit:
-	lui     v1, hi(MODE_NEXT)
-	lbu     v1, lo(MODE_NEXT)(v1)
+	lui     v1, hi(XP_ZOKN)
+	lbu     v1, lo(XP_ZOKN)(v1)
 	nop
 	xori    v1, v1, 3
 	bnez    v1, @@no
@@ -54,8 +56,8 @@ xp_zg_dan:
 
 ; Anita, Down: Zangief in Versus, else the cell character.
 xp_zg_anita:
-	lui     v1, hi(MODE_NEXT)
-	lbu     v1, lo(MODE_NEXT)(v1)
+	lui     v1, hi(XP_ZOKN)
+	lbu     v1, lo(XP_ZOKN)(v1)
 	li      v0, 3
 	bne     v1, v0, @@cell
 	li      t2, ZG_CHAR
@@ -92,8 +94,8 @@ xp_zchar:
 	lbu     t7, 0x68(t6)
 	li      t8, ZG_CHAR
 	bne     t7, t8, @@ret
-	lui     t8, hi(MODE)
-	lbu     t8, lo(MODE)(t8)
+	lui     t8, hi(XP_ZOK)
+	lbu     t8, lo(XP_ZOK)(t8)
 	nop
 	xori    t8, t8, 3
 	bnez    t8, @@ret               ; not a Versus match
@@ -126,8 +128,8 @@ xp_patchar:
 	bne     v1, t7, @@done
 	nop
 	; same tests as xp_zchar, inline (no ra here: this is a leaf caller)
-	lui     t7, hi(MODE)
-	lbu     t7, lo(MODE)(t7)
+	lui     t7, hi(XP_ZOK)
+	lbu     t7, lo(XP_ZOK)(t7)
 	nop
 	xori    t7, t7, 3
 	bnez    t7, @@done
@@ -211,14 +213,14 @@ xp_labelkey2:
 	li      t2, ZG_CHAR
 	bne     v1, t2, @@other
 	lb      t0, 0x73(a1)
-	lui     t1, hi(MODE_NEXT)
-	lbu     t1, lo(MODE_NEXT)(t1)
+	lui     t1, hi(XP_ZOKN)
+	lbu     t1, lo(XP_ZOKN)(t1)
 	li      t2, 3
 	beq     t1, t2, @@vs            ; select screen
 	nop
 	bnez    t1, @@ret
-	lui     t1, hi(MODE)            ; VS screen: MODE_NEXT is 0, MODE 3
-	lbu     t1, lo(MODE)(t1)
+	lui     t1, hi(XP_ZOK)            ; VS screen: MODE_NEXT is 0, MODE 3
+	lbu     t1, lo(XP_ZOK)(t1)
 	nop
 	bne     t1, t2, @@ret
 @@vs:
@@ -657,8 +659,8 @@ xp_zselload:
 	sw      ra, 0x10(sp)
 	jal     0x801043C0
 	nop
-	lui     v0, hi(MODE_NEXT)
-	lbu     v0, lo(MODE_NEXT)(v0)
+	lui     v0, hi(XP_ZOKN)
+	lbu     v0, lo(XP_ZOKN)(v0)
 	li      at, 3
 	bne     v0, at, @@done
 	lui     at, hi(CACHE_P1)
@@ -743,14 +745,14 @@ XP_ZPEND:
 ; graphics buffer, t9 = 0 on the select screen (a cache byte is 0xFF), 1 on
 ; the VS screen. Leaf: v0, v1, at, t9.
 xp_zport:
-	lui     v0, hi(MODE_NEXT)
-	lbu     v0, lo(MODE_NEXT)(v0)   ; select: mode being set up
+	lui     v0, hi(XP_ZOKN)
+	lbu     v0, lo(XP_ZOKN)(v0)   ; select: mode being set up
 	li      at, 3
 	beq     v0, at, @@vs
 	nop
 	bnez    v0, @@no
-	lui     v0, hi(MODE)            ; VS screen: MODE_NEXT is 0 again
-	lbu     v0, lo(MODE)(v0)
+	lui     v0, hi(XP_ZOK)            ; VS screen: MODE_NEXT is 0 again
+	lbu     v0, lo(XP_ZOK)(v0)
 	nop
 	bne     v0, at, @@no
 @@vs:
@@ -930,8 +932,8 @@ xp_zhud2:                               ; 0x8014CE60
 xp_zhud_test:
 	li      at, ZG_CHAR
 	bne     v0, at, @@tab
-	lui     at, hi(MODE)
-	lbu     at, lo(MODE)(at)
+	lui     at, hi(XP_ZOK)
+	lbu     at, lo(XP_ZOK)(at)
 	nop
 	xori    at, at, 3
 	bnez    at, @@tab
@@ -966,8 +968,8 @@ xp_zwinpal:
 	li      t9, 1
 	li      t9, 2
 @@side:
-	lui     at, hi(MODE)
-	lbu     at, lo(MODE)(at)
+	lui     at, hi(XP_ZOK)
+	lbu     at, lo(XP_ZOK)(at)
 	nop
 	xori    at, at, 3
 	bnez    at, @@van
@@ -1195,4 +1197,177 @@ XP_ZSEL:
 	.halfword ZG_XAFILE
 .org 0x8016606C + 47 * 4
 	.word   0x80000000 | ZG_XA_LEN
+.endif
+
+; ============================================================================
+; ARCADE (step 7)
+; xp_frame (every frame, from the main loop's call of the loader step
+; 0x8010436C): XP_ZOK = 3 if MODE is Versus (3) or Arcade (1, not Street
+; Puzzle: XP_STREET), else 0; XP_ZOKN the same for MODE_NEXT. The Zangief
+; tests read these instead of the mode, so they hold in both modes.
+; Code space: 0x8010868C-0x80108924, six functions with no references that
+; never run (coverage: boot, menus, Versus, a whole Arcade run with its
+; ending, Street Puzzle, option menus, training demo).
+; ============================================================================
+XP_STREET equ 0x8019C3F5                ; 1 in Street Puzzle
+
+.org 0x80102458
+	jal     xp_frame                ; was jal 0x8010436C
+
+.org 0x8010868C
+.area 0x80108924 - 0x8010868C, 0
+xp_frame:
+	lui     t0, hi(MODE)
+	lbu     t6, lo(MODE)(t0)
+	lbu     t2, lo(MODE_NEXT)(t0)
+	lbu     t3, lo(XP_STREET)(t0)
+	la      t4, XP_ZOK
+	li      t5, 3
+	li      t7, 2
+@@loop:
+	beq     t6, t5, @@ok
+	li      t8, 1
+	bne     t6, t8, @@no
+	nop
+	beqz    t3, @@ok                ; Arcade, not Street Puzzle
+	nop
+@@no:
+	b       @@st
+	move    t9, zero
+@@ok:
+	li      t9, 3
+@@st:
+	sb      t9, 0(t4)
+	addiu   t4, t4, 1
+	addiu   t7, t7, -1
+	bnez    t7, @@loop
+	move    t6, t2                  ; second round: MODE_NEXT
+	j       0x8010436C
+	nop
+
+.if ZG_HAVE
+; ---- Arcade opponents ----
+; The CPU's character is set at 0x8012CCD4 (first opponent of a match set-up)
+; and in the delay slot of 0x8012CEB8 (next opponent); both then call
+; 0x8012CDBC with a2 = the CPU's player struct. xp_zcpu sets that struct's
+; Zangief bit: in Arcade, when the opponent is Dan (10, the 9th opponent of
+; every run), Zangief comes instead one time in two ("challenger"), unless
+; the player is Zangief himself; any other opponent clears the bit.
+xp_zopp1:
+	sb      a1, 0x68(s2)            ; (replaced instruction)
+	j       xp_zcpu
+	move    a2, s2
+
+xp_zopp2:
+	addiu   sp, sp, -0x18
+	sw      ra, 0x10(sp)
+	jal     xp_zcpu
+	nop
+	lw      ra, 0x10(sp)
+	addiu   sp, sp, 0x18            ; (load delay: not j right after lw)
+	j       0x8012CDBC
+	nop
+
+; a2 = the CPU's struct; leaf, t0-t9 only
+xp_zcpu:
+	lui     t0, hi(MODE)
+	lbu     t1, lo(MODE)(t0)
+	lbu     t2, lo(XP_STREET)(t0)
+	li      t3, 1
+	bne     t1, t3, @@ret           ; Arcade only
+	nop
+	bnez    t2, @@ret
+	lbu     t2, 0x6C(a2)            ; 1 = played by the CPU
+	nop
+	beqz    t2, @@ret               ; a human (Arcade challenger): his own choice
+	li      t4, P1_STRUCT
+	beq     a2, t4, @@bit
+	li      t4, 1
+	li      t4, 2
+@@bit:
+	la      t5, XP_ZBITS
+	lbu     t6, 0(t5)
+	nor     t7, t4, zero
+	and     t7, t6, t7              ; this side's bit cleared
+	lbu     t8, 0x68(a2)
+	li      t9, ZG_CHAR
+	bne     t8, t9, @@store
+	xori    t8, t4, 3
+	and     t8, t6, t8
+	bnez    t8, @@store             ; the player is Zangief: plain Dan
+	lui     t8, 0x1F80
+	lhu     t8, 0x1100(t8)          ; root counter 0: one time in two
+	nop
+	andi    t8, t8, 1
+	beqz    t8, @@store
+	nop
+	or      t7, t7, t4
+@@store:
+	sb      t7, 0(t5)
+@@ret:
+	jr      ra
+	nop
+
+; ---- Zangief's Arcade order ----
+; 0x8012CD18 copies the run's opponent order (one of 8 rows of 0x8016D49C)
+; to 0x8019F45C; its jr ra at 0x8012CDB4 comes here. When the player is
+; Zangief, Felicia (6), his rival in Pocket Fighter, is moved to the 8th
+; place: the last regular opponent, before Dan and the bosses.
+xp_zorder:
+	la      t0, XP_ZOK
+	lbu     t1, 0(t0)               ; XP_ZOK (match) or XP_ZOKN (select)
+	lbu     t2, 1(t0)
+	nop
+	or      t1, t1, t2
+	beqz    t1, @@ret
+	la      t0, XP_ZBITS
+	lbu     t1, 0(t0)
+	lui     t2, 0x801B
+	lbu     t3, -0x1A98(t2)         ; P1 character (0x801AE568)
+	lbu     t4, -0x17EC(t2)         ; P2 character (0x801AE814)
+	xori    t3, t3, ZG_CHAR
+	sltiu   t3, t3, 1
+	xori    t4, t4, ZG_CHAR
+	sltiu   t4, t4, 1
+	sll     t4, t4, 1
+	or      t3, t3, t4
+	and     t1, t1, t3
+	beqz    t1, @@ret
+	la      t0, 0x8019F45C
+	move    t2, zero
+	li      t5, 6
+@@find:
+	addu    t3, t0, t2
+	lbu     t4, 0(t3)
+	nop
+	beq     t4, t5, @@swap
+	addiu   t2, t2, 1
+	sltiu   t4, t2, 8
+	bnez    t4, @@find
+	nop
+	b       @@ret
+	nop
+@@swap:
+	lbu     t4, 7(t0)
+	sb      t5, 7(t0)
+	sb      t4, 0(t3)
+@@ret:
+	jr      ra
+	nop
+.endif
+
+.align 4
+XP_ZOK:
+	.byte   0                       ; from MODE
+XP_ZOKN:
+	.byte   0                       ; from MODE_NEXT
+.endarea
+
+.if ZG_HAVE
+.org 0x8012CCD4
+	jal     xp_zopp1                ; was sb a1, 0x68(s2)
+.org 0x8012CEB8
+	jal     xp_zopp2                ; was jal 0x8012CDBC (delay: sb v0, 0x68(s2))
+.org 0x8012CDB4
+	j       xp_zorder               ; was jr ra
 .endif
