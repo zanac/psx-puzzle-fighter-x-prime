@@ -25,6 +25,7 @@ def main(patch_path, src, dst):
             data[off:off + len(b)] = b
         assert hashlib.sha1(data).hexdigest() == f['sha1_out'], f['path']
         D.replace_file(img, f['path'], bytes(data))
+    disc = discout.to_raw(disc)          # same writer as build.sh (makedisc.py)
     for f in discout.write_all(disc, discout.output_base(dst)):
         print('wrote %s' % f)
 
