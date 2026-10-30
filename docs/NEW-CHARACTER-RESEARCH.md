@@ -1,5 +1,8 @@
 # Zangief port: step 0 research
 
+> **Note (step 8).** Builds always need Pocket Fighter now (`./build.sh <SPF2T> <Pocket Fighter> <output> [armips]`). The `XP_PF` variable, the `ZG_HAVE` switch and the "plain build" below belong to the history of steps 0–7.
+
+
 Findings so far for [PLAN-new-character.md](PLAN-new-character.md). All addresses are RAM unless noted.
 
 ## Pocket Fighter (SLUS-00653): Zangief's sprites, decoded

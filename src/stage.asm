@@ -4,10 +4,10 @@
 ; the stage brings its own music. In Versus, a line under the character grid
 ;   L1 < STAGE:  NORMAL  > R1
 ; is changed by P1 (until P1 confirms): R1 next, L1 previous:
-;   NORMAL, RANDOM, MORRIGAN .. AKUMA (the 10 stages), [ZANGIEF], NORMAL ...
-; NORMAL is vanilla (P1's stage; Zangief's own with ZG_HAVE). RANDOM (the
+;   NORMAL, RANDOM, MORRIGAN .. AKUMA (the 10 stages), ZANGIEF, NORMAL ...
+; NORMAL is vanilla (P1's stage; Zangief's is his own). RANDOM (the
 ; default) draws a stage at every match, never the one of the previous
-; match; Zangief's stage (ZG_HAVE) has 3 tickets of 13 when he plays, 1 of
+; match; Zangief's stage has 3 tickets of 13 when he plays, 1 of
 ; 11 otherwise. The setting lives until the title
 ; screen comes back (xp_title resets it to RANDOM). Arcade, Street Puzzle and demo are not touched.
 ;
@@ -26,7 +26,7 @@ STAGE_PAL   equ 5
 STAGE_CELL  equ TEXT_MAP + STAGE_COL * 0x78 + STAGE_ROW * 4
 STAGE_TAG   equ (STAGE_PAL << 16) | 0xCC ; 'L' top half: marks our line
 STAGE_LEN   equ 25
-N_SETTINGS  equ 12 + ZG_HAVE            ; NORMAL, RANDOM, 10 stages (+ ZANGIEF)
+N_SETTINGS  equ 13                     ; NORMAL, RANDOM, 10 stages, ZANGIEF
 
 .org 0x801544E4
 .area 0x801548C8 - 0x801544E4, 0
@@ -151,7 +151,7 @@ xp_stage_erase:
 
 ; stage index at match start (replaces "lbu v0, 0x68(s2)" at 0x8012CCE0,
 ; returns v0; a0-a2 and s regs preserved; ra is saved by the caller).
-; With Zangief's stage (ZG_HAVE) there is an 11th stage, index 11
+; Zangief's stage is an 11th stage, index 11
 ; (zangief.asm); 10 stays Dan's (Ken's picture, Dan's music).
 xp_stage:
 	move    t9, ra
@@ -165,16 +165,10 @@ xp_stage:
 	nop
 	bnez    t1, @@set
 	addiu   t1, t1, -2
-.if ZG_HAVE
 	jal     xp_zchar                ; NORMAL: P1's character, 11 = Zangief
 	move    t6, s2
 	b       @@last
 	move    v0, t7
-.else
-	b       @@last
-	nop
-.endif
-.if ZG_HAVE
 @@arc:                                  ; Arcade: the CPU's stage; Zangief's own
 	li      t3, ZG_CHAR
 	bne     v0, t3, @@last
@@ -183,20 +177,11 @@ xp_stage:
 	move    t6, s2
 	b       @@last
 	move    v0, t7
-.else
-@@arc:
-	b       @@last
-	nop
-.endif
 @@set:
 	bgez    t1, @@pos               ; fixed stage (position 0..N_STAGES-1)
 	move    v0, t1
-.if ZG_HAVE
 	jal     xp_zstg_tickets         ; t5 = 11 tickets, 13 if Zangief plays
 	nop
-.else
-	li      t5, 10
-.endif
 	lw      t3, 4(t2)               ; RANDOM: LCG, stirred with the root
 	lui     t6, 0x1F80              ; counters (so it depends on when the
 	lhu     t7, 0x1100(t6)          ; players press the buttons)
@@ -311,7 +296,5 @@ xp_stg_names:                           ; 8 characters each, centred
 	.ascii  " NORMAL  RANDOM MORRIGANCHUN-LI "
 	.ascii  "  RYU     KEN   HSIEN-KODONOVAN "
 	.ascii  "FELICIA  SAKURA DEVILOT  AKUMA  "
-.if ZG_HAVE
 	.ascii  "ZANGIEF "
-.endif
 .endarea

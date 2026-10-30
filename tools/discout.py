@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Disc image input/output for the X' tools: read a BIN, a CUE (one or more
+"""Disc image input/output for the X" tools: read a BIN, a CUE (one or more
 BIN files, e.g. a Redump set) or a single-disc PBP, and write the result as
 BIN + CUE and as PBP.
 
@@ -20,7 +20,7 @@ SYNC = bytes.fromhex('00ffffffffffffffffffff00')
 # Track layout of the full NTSC-U disc (data + 2 CD-DA tracks), in sectors
 # from the start of the image: (number, audio, index 00, index 01)
 KNOWN_LAYOUT = [(1, False, 0, 0), (2, True, 222654, 222804), (3, True, 241929, 242079)]
-TITLE = "Super Puzzle Fighter II Turbo X'"
+TITLE = 'Super Puzzle Fighter II Turbo X"'
 DISC_ID = 'SLUS00418'
 
 def bcd(n):

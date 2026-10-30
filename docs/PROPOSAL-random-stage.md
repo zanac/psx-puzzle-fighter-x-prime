@@ -36,7 +36,7 @@ A line under the character grid, **Versus only**:
 ![Mockup of the stage line](screenshots/proposal_stage_text.png)
 
 (Real mockup: the text is written to the game's own text layer in the
-emulator, same font and palette as the in-match `X'` marker.)
+emulator, same font and palette as the in-match `X"` marker.)
 
 - **R1** next / **L1** previous (P1 only, until P1 confirms) change the setting
   (first version used SELECT; changed to L1/R1 on request):
@@ -62,7 +62,7 @@ Implementation sketch (small):
 2. Select-screen per-frame hook: read SELECT edge for both pads, cycle the
    setting, print the line with the vanilla print routine `0x80107CB8`.
 3. Erase the line on scene change (we already have a scene-init hook for
-   the `X'` marker).
+   the `X"` marker).
 4. Code space: about 150-200 bytes, in the free areas we already use.
 
 ## Proposal B (minimal): always random in Versus
@@ -86,6 +86,6 @@ Tested in the emulator:
 - Every setting gives the expected stage index.
 - RANDOM over 8 matches in a row gave 7, 1, 6, 5, 7, 1, 4, 0, with no stage repeated back to back.
 - The setting survives CONTINUE and is back to the default after END and the title.
-- The line is erased on the VS screen and in matches, where the X' marker is intact.
+- The line is erased on the VS screen and in matches, where the X" marker is intact.
 - The Arcade select has no line, and the Arcade stages are vanilla.
 - The full regression passes: damage fuzz 150/150, select, Arcade with Devilot, Street Puzzle and demo.

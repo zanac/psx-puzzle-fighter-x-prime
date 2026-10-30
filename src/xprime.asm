@@ -1,4 +1,5 @@
-; Super Puzzle Fighter II Turbo (NTSC-U, SLUS-00418) — X' rebalance
+; Super Puzzle Fighter II Turbo (NTSC-U, SLUS-00418) — X" (the X' rebalance,
+; plus PSX additions: Dan's pattern, Zangief, stage selector, challenges)
 ; Assemble with armips: armips src/xprime.asm -strequ IN <exe> -strequ OUT <out>
 
 .psx
@@ -9,10 +10,10 @@ CURSOR_CHARS equ 0x8016F6E4             ; cursor position -> character
 ALT_BITS     equ 0x801AE4D8             ; +0 Mei-Ling bits, +1 Anita bits
 TEXT_MAP     equ 0x801C111C             ; text layer, 48 cols x 30 rows, col stride 0x78
 TEXT_DIRTY   equ 0x801667C0             ; text layer redraw counter
-MARKER_COL   equ 22                     ; X' between the win counters
+MARKER_COL   equ 22                     ; X" between the win counters
 MARKER_ROW   equ 26
 MARKER_PAL   equ 5
-TITLE_COL    equ 11                     ; "X' BALANCE PATCH BY ZANAC" on the title, under the copyright
+TITLE_COL    equ 11                     ; 'X" BALANCE PATCH BY ZANAC' on the title, under the copyright
 TITLE_ROW    equ 28
 MODE         equ 0x8019C40F             ; game mode of the match (3 = Versus)
 MODE_NEXT    equ 0x8019C3FF             ; mode being set up (on the select screen)
@@ -452,7 +453,7 @@ xp_title:
 	jr      t8
 	nop
 xp_title_text:
-	.ascii  "X' BALANCE PATCH BY ZANAC"
+	.ascii  "X\" BALANCE PATCH BY ZANAC"
 	.byte   0
 	.align  4
 .endarea
@@ -483,7 +484,7 @@ xp_labelkey:
 	jr      ra
 	nop
 
-; ---- X' marker between the win counters (8x16 font, text layer) ----
+; ---- X" marker between the win counters (8x16 font, text layer) ----
 ; xp_marker_set: t3 != 0 draws the marker, t3 == 0 erases it if present.
 ; Only t0-t3 are touched: the init hook's caller relies on a0-a3 surviving.
 MARKER_X equ (MARKER_PAL << 16) | 0xD8  ; 'X' top half; the cell value we test
@@ -498,9 +499,9 @@ xp_marker_set:
 	sw      t1, 0(t0)
 	li      t1, (MARKER_PAL << 16) | 0xF8   ; 'X' bottom half
 	sw      t1, 4(t0)
-	li      t1, (MARKER_PAL << 16) | 0x87   ; apostrophe top half
+	li      t1, (MARKER_PAL << 16) | 0x82   ; double prime (") top half
 	sw      t1, 0x78(t0)
-	li      t1, (MARKER_PAL << 16) | 0xA7   ; apostrophe bottom half
+	li      t1, (MARKER_PAL << 16) | 0xA2   ; double prime (") bottom half
 	b       @@dirty
 	sw      t1, 0x7C(t0)
 @@erase:
@@ -586,7 +587,7 @@ xp_marker_clear:
 	jal     xp_done                 ; P2 pose
 
 ; ============================================================================
-; X' MARKERS
+; X" MARKERS
 ; ============================================================================
 .org 0x80123FE4
 	jal     xp_marker_clear         ; scene / round init

@@ -1,36 +1,36 @@
 #!/usr/bin/env python3
-"""Apply the X' patch (JSON, made by mkpatch.py) to an original disc image.
+"""Apply the X" executable patch (JSON, made by mkpatch.py): used by
+build.sh when no armips is given.
 
-usage: applypatch.py PATCH.json ORIGINAL.(bin|cue|pbp) OUTPUT
-Writes OUTPUT.bin + OUTPUT.cue + OUTPUT.pbp, whatever the input format
-(OUTPUT may carry one of those extensions). Pure Python 3, no dependencies.
+usage: applypatch.py PATCH.json SLUS_004.18 FILES_BIN OUT_EXE
+FILES_BIN is the file table build.sh computed for this disc (with
+Zangief's new files): it must be the one the patch was assembled with,
+or the patched executable would point at the wrong sectors.
+Pure Python 3, no dependencies.
 """
-import hashlib, json, os, sys
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import discpatch as D
-import discout
+import hashlib, json, sys
 
-def main(patch_path, src, dst):
+def main(patch_path, exe, table, out):
     patch = json.load(open(patch_path))
-    disc = discout.load(src)
-    img = disc.img
-    for f in patch['files']:
-        lba, size = D.iso_find(img, f['path'])
-        data = bytearray(D.iso_read(img, lba, size))
-        h = hashlib.sha1(data).hexdigest()
-        if h != f['sha1_in']:
-            sys.exit('%s does not match the original NTSC-U SLUS-00418 (sha1 %s)' % (f['path'], h))
-        for off, hexdata in f['runs']:
-            b = bytes.fromhex(hexdata)
-            data[off:off + len(b)] = b
-        assert hashlib.sha1(data).hexdigest() == f['sha1_out'], f['path']
-        D.replace_file(img, f['path'], bytes(data))
-    disc = discout.to_raw(disc)          # same writer as build.sh (makedisc.py)
-    for f in discout.write_all(disc, discout.output_base(dst)):
-        print('wrote %s' % f)
+    f = patch['exe']
+    data = bytearray(open(exe, 'rb').read())
+    h = hashlib.sha1(data).hexdigest()
+    if h != f['sha1_in']:
+        sys.exit('SLUS_004.18 does not match the original NTSC-U SLUS-00418 (sha1 %s)' % h)
+    t = hashlib.sha1(open(table, 'rb').read()).hexdigest()
+    if t != patch['files_table_sha1']:
+        sys.exit('the new files built from your Pocket Fighter disc do not have the '
+                 'expected sizes (file table sha1 %s); build with armips instead '
+                 '(./build.sh ... path/to/armips)' % t)
+    for off, hexdata in f['runs']:
+        b = bytes.fromhex(hexdata)
+        data[off:off + len(b)] = b
+    if hashlib.sha1(data).hexdigest() != f['sha1_out']:
+        sys.exit('patched executable sha1 mismatch')
+    open(out, 'wb').write(data)
 
 if __name__ == '__main__':
-    if len(sys.argv) != 4:
+    if len(sys.argv) != 5:
         print(__doc__)
         sys.exit(1)
     main(*sys.argv[1:])

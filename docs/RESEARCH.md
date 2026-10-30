@@ -186,7 +186,7 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 
 ---
 
-## 7. Name labels, text layer, X' markers
+## 7. Name labels, text layer, X" markers
 
 **Name labels (select screen).** Each player has a label object: P1 at `0x801BE5A8`, P2 at `+0x150`.
 - Every frame, `0x80116438` (P1) and `0x8011649C` (P2) compare the select character with `+0x58` and call the setter `0x801163A0` on change.
@@ -200,10 +200,10 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 - API: `0x80107C98` colour, `0x80107CA8` font (0 = 8×8, 1 = 8×16, 2 = big), `0x80107CB8(col,row,str)` print, `0x80107C20` clear.
 - 8×16 font tiles: top = `(c&0x1F) + ((c&0xE0)<<1) + 0x40`, bottom = top + `0x20`.
 
-**X' markers.**
-- In a match, "X'" (8×16 font, palette 5) is drawn at col 22, row 26, between the win counters. It is written by a hook on the three calls to the per-frame match update `0x801351C8`.
+**X" markers.**
+- In a match, `X"` (8×16 font, palette 5; the double prime is cells 0x82 / 0xA2, the font's `"`) is drawn at col 22, row 26, between the win counters. It is written by a hook on the three calls to the per-frame match update `0x801351C8`.
 - It is erased on scene init (`0x80123FE4`).
-- On the title screen, "X' BALANCE PATCH BY ZANAC" is printed at row 28.
+- On the title screen, `X" BALANCE PATCH BY ZANAC` is printed at row 28. (Until the Zangief release this project was called X', like the arcade patch; it is X" now, X' plus the PSX additions.)
 
 **Task stacks are small.** Hooks running in the scene-init path must not open a stack frame: an extra 0x18 bytes there corrupted the next scene. The stubs keep `ra` in `t8`.
 
@@ -245,6 +245,6 @@ There is no handicap or free-play setting: free play is meaningless on console, 
 3. **Versus handicap** (Difficulty 1-5) is kept, with vanilla behaviour: `x += floor(x/10) * (diff + 1)` when the opponent's level is higher.
 4. **Free play** is not applicable on console.
 5. **Bosses:** the `+0x6C` flag is irrelevant under X' (no Devilot/Akuma penalty any more).
-6. **Branding:** X' marker in matches, "X' BALANCE PATCH BY ZANAC" on the title.
+6. **Branding:** X" marker in matches, `X" BALANCE PATCH BY ZANAC` on the title (the arcade patch has X').
 7. **Mei-Ling / Anita labels** on the select screen (redrawn unused Japanese labels).
 8. **Versus stage:** the selector starts at RANDOM. The choice is kept between matches until the title screen comes back. RANDOM never repeats the stage of the previous match.

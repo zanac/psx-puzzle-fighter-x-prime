@@ -222,7 +222,7 @@ def main(argv):
     imgs[GOUKI] = compose(orig, 'MEI-LING')
     put_stream(emi, GOUKI, imgs[GOUKI], gou_off, dan_off + dan_len - gou_off)
 
-    # 4. ZANGIEF (PSX X' hidden character) in the two small labels 13 and 14
+    # 4. ZANGIEF (PSX X" hidden character) in the two small labels 13 and 14
     #    (small-font MORRIGAN / CHUN-LI, never decoded in boot, menus,
     #    Versus, Arcade or Street Puzzle), which are contiguous
     s13, s14 = record(orig, ZG_SLOT), record(orig, ZG_SLOT + 1)

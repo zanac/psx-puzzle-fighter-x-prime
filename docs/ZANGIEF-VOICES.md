@@ -1,6 +1,6 @@
 # Zangief voice map
 
-How Zangief's voices are wired, so a sample can be swapped quickly. Change `VOICE_MAP` in `tools/zangief.py` and rebuild with `XP_PF`.
+How Zangief's voices are wired, so a sample can be swapped quickly. Change `VOICE_MAP` in `tools/zangief.py` and rebuild (`./build.sh <SPF2T> <Pocket Fighter> <output>`).
 
 - The game plays voice **ids** from Dan's sound table (`SE_PL0A.EMI` entry 0). Ids 0–23 are the 24 slots; 25–33 replay some slots with other parameters.
 - Script cues use Dan's voice table `0x8016EFF4` (index 1–6 → ids 25–30; 7/8 → ids 14/15, added for Zangief).

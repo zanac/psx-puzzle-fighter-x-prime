@@ -68,7 +68,7 @@ xp_zg_dan:
 	j       xp_mv_cell
 	move    t3, zero
 
-; Anita, Down: Zangief in Versus, else the cell character.
+; Anita, Down: Zangief in Versus / Arcade, else the cell character.
 xp_zg_anita:
 	lui     v1, hi(XP_ZOKN)
 	lbu     v1, lo(XP_ZOKN)(v1)
@@ -176,7 +176,6 @@ xp_alt_reset:
 	j       0x801245DC
 	sb      zero, lo(XP_ZBITS)(at)
 
-.if ZG_HAVE
 ; ---- Zangief's stage (step 6): index 11 ----
 ; The four per-stage tables (11 entries each: load, set-up, per-frame,
 ; stage objects) and the stage -> song table are copied here with a 12th
@@ -209,7 +208,6 @@ xp_zstg_load:
 	addiu   sp, sp, 0x18            ; (load delay: not jr right after lw)
 	jr      ra
 	nop
-.endif
 
 .endarea
 
@@ -598,7 +596,6 @@ xp_zpal3:
 	j       0x80108C68
 	nop
 
-.if ZG_HAVE
 ; RANDOM stage tickets (from xp_stage): t5 = 13 if a player is Zangief,
 ; else 11. Uses t3 (ra), t5-t8 and at.
 xp_zstg_tickets:
@@ -640,7 +637,6 @@ xp_songent:
 @@ret:
 	jr      ra
 	nop
-.endif
 .endarea
 
 ; ============================================================================
@@ -671,10 +667,8 @@ DAN_PLIST equ 0x80189F24        ; Dan's portrait list
 xp_zselload:
 	addiu   sp, sp, -0x18
 	sw      ra, 0x10(sp)
-.if ZG_HAVE
 	la      at, XP_ZEND
 	sb      zero, 0(at)
-.endif
 	jal     0x801043C0
 	nop
 	lui     v0, hi(XP_ZOKN)
@@ -763,11 +757,9 @@ XP_ZPEND:
 ; graphics buffer, t9 = 0 on the select screen (a cache byte is 0xFF), 1 on
 ; the VS screen. Leaf: v0, v1, at, t9.
 xp_zport:
-.if ZG_HAVE
 	j       xp_zportend             ; staff roll first
 	nop
 xp_zport_sel:
-.endif
 	lui     v0, hi(XP_ZOKN)
 	lbu     v0, lo(XP_ZOKN)(v0)   ; select: mode being set up
 	li      at, 3
@@ -1114,9 +1106,7 @@ XP_ZSEL:
 	.word   0, 0                    ; graphics, record bank (0 = none pending)
 .endarea
 
-; hooks only when the build has Zangief's file (XP_PF in build.sh);
-; otherwise he keeps Dan's in-match look
-.if ZG_HAVE
+; hooks for his own file and Pocket Fighter assets (build.sh)
 .org 0x8010BB1C
 	j       xp_zload
 	nop
@@ -1220,7 +1210,6 @@ XP_ZSEL:
 	.halfword ZG_XAFILE
 .org 0x8016606C + 47 * 4
 	.word   0x80000000 | ZG_XA_LEN
-.endif
 
 ; ============================================================================
 ; ARCADE (step 7)
@@ -1265,18 +1254,15 @@ xp_frame:
 	addiu   t7, t7, -1
 	bnez    t7, @@loop
 	move    t6, t2                  ; second round: MODE_NEXT
-.if ZG_HAVE
 	lbu     t9, -2(t4)              ; XP_ZOK
 	la      t8, XP_ZEND
 	bnez    t9, @@keep
 	nop
 	sb      zero, 0(t8)             ; out of Versus / Arcade: no staff roll
 @@keep:
-.endif
 	j       0x8010436C
 	nop
 
-.if ZG_HAVE
 ; ---- Arcade opponents ----
 ; The CPU's character is set at 0x8012CCD4 (first opponent of a match set-up)
 ; and in the delay slot of 0x8012CEB8 (next opponent); both then call
@@ -1385,7 +1371,6 @@ xp_zorder:
 @@ret:
 	jr      ra
 	nop
-.endif
 
 .align 4
 XP_ZOK:
@@ -1394,14 +1379,12 @@ XP_ZOKN:
 	.byte   0                       ; from MODE_NEXT
 .endarea
 
-.if ZG_HAVE
 .org 0x8012CCD4
 	jal     xp_zopp1                ; was sb a1, 0x68(s2)
 .org 0x8012CEB8
 	jal     xp_zopp2                ; was jal 0x8012CDBC (delay: sb v0, 0x68(s2))
 .org 0x8012CDB4
 	j       xp_zorder               ; was jr ra
-.endif
 
 ; ============================================================================
 ; STAFF ROLL FIGURE (step 7)
@@ -1419,7 +1402,6 @@ XP_ZOKN:
 ; never runs (coverage: boot, menus, Versus, a whole Arcade run with its
 ; ending, Street Puzzle, option menus).
 ; ============================================================================
-.if ZG_HAVE
 
 .org 0x801080BC
 .area 0x801082BC - 0x801080BC, 0
@@ -1681,4 +1663,3 @@ xp_zhland:
 .org 0x8011EF78
 	j       xp_zhland
 	nop
-.endif

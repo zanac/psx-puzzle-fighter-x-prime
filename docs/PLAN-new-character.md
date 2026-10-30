@@ -1,6 +1,6 @@
 # Plan: Zangief from Pocket Fighter as a hidden character
 
-Branch: `experimental/new-character`. Status: **steps 0–7 done**; findings in [NEW-CHARACTER-RESEARCH.md](NEW-CHARACTER-RESEARCH.md).
+Branch: `experimental/new-character`. Status: **steps 0–8 done**; findings in [NEW-CHARACTER-RESEARCH.md](NEW-CHARACTER-RESEARCH.md).
 
 ## Decisions (agreed)
 
@@ -135,11 +135,16 @@ Branch: `experimental/new-character`. Status: **steps 0–7 done**; findings in 
 - His staff roll figure is the picture of his Pocket Fighter opening (in a suit, adjusting his glasses), standing on the bottom-right edge of the screen like the others' figures.
 - On HARD he joins the finale, where the cast gathers under the CAPCOM logo: whoever the player is, he appears last, in the back row's middle, and flexes.
 
-### Step 8: packaging
+### Step 8: packaging (done)
 
-- `build.sh` / `patch.sh` with the second disc as input, plus checks of the Pocket Fighter image.
-- README and screenshots.
-- The release carries tools only, still no game data.
+- **One release, Pocket Fighter required.** On 2026-10-30 the user chose a single release that needs Pocket Fighter: X" always has Zangief.
+  - `build.sh <SPF2T> <Pocket Fighter> <output> [armips]`; `patch.sh` is the same without armips.
+  - The ZG_HAVE switch and the builds without Pocket Fighter are gone.
+- **Checks.** `tools/checkpf.py` checks the Pocket Fighter disc (SLUS_006.53 SHA-1).
+- **The patch.** `xprime-patch.json` now patches only the executable, which holds no game data. It also carries the SHA-1 of the file table, which depends on the sizes of the files built from Pocket Fighter.
+- **Name.** The project is X" ("X double prime": X' plus the PSX additions). The title line and the in-game marker say `X"`.
+- **README.** It has Zangief's screenshots (select, VS, match, WINNER, Arcade, ending).
+- **The release.** It carries tools only, no game data.
 
 ## Risks
 
