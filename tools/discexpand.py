@@ -3,7 +3,13 @@
 tracks after it, and list the files in an ISO directory.
 
 The new files go right after the last file of the data track, each in its
-own run of Mode 2 Form 1 sectors (EDC/ECC computed). The data track keeps a
+own run of Mode 2 Form 1 sectors (EDC/ECC computed). A file named *.XA is
+XA audio instead: its content is whole sectors without sync and header
+(2336 bytes each: subheader twice, 2324 bytes, EDC), written as they are
+(Mode 2 Form 2); its directory size counts 2048 bytes per sector, as on
+the original disc. XA_GAP empty data sectors come before it: the file loader
+reads past the end of a file, and an XA audio sector there never arrives
+as data (the load hangs). The data track keeps a
 150-sector postgap before the audio, as on the original disc. Everything
 after the data track (the two CD-DA tracks) is moved by the same amount,
 and the volume space size in the PVD grows by it.
@@ -27,6 +33,22 @@ POSTGAP = 150
 
 def bcd(n):
     return (n // 10) << 4 | (n % 10)
+
+XA_UNIT = 2336
+XA_GAP = 16
+
+def nsectors(name, size):
+    if name.upper().endswith('.XA'):
+        return size // XA_UNIT
+    return max(1, (size + 2047) // 2048)
+
+def raw_sector(lba, unit):
+    s = bytearray(SECT)
+    s[0:12] = discout.SYNC
+    m, sec, f = discout.msf(lba + 150)
+    s[12:16] = bytes([bcd(m), bcd(sec), bcd(f), 2])
+    s[16:16 + XA_UNIT] = unit
+    return s
 
 def make_sector(lba, payload, submode):
     s = bytearray(SECT)
@@ -95,8 +117,10 @@ def layout(disc, sizes):
     last = max(e + (s + 2047) // 2048 for e, s in ext)
     lbas, pos = {}, last
     for name, size in sizes:
+        if name.upper().endswith('.XA'):
+            pos += XA_GAP
         lbas[name] = pos
-        pos += max(1, (size + 2047) // 2048)
+        pos += nsectors(name, size)
     new_end = max(data_end, pos + POSTGAP)
     return lbas, new_end - data_end, last, data_end, pos, new_end
 
@@ -108,7 +132,13 @@ def expand(disc, files, directory='/DATA'):
     tail = bytes(raw[data_end * SECT:])                 # the CD-DA tracks
     body = bytearray(raw[:last * SECT])
     for name, data in files:
-        n = max(1, (len(data) + 2047) // 2048)
+        n = nsectors(name, len(data))
+        while len(body) // SECT < lbas[name]:           # gap before an XA file
+            body += make_sector(len(body) // SECT, b'', 0)
+        if name.upper().endswith('.XA'):
+            for i in range(n):
+                body += raw_sector(lbas[name] + i, data[i * XA_UNIT:(i + 1) * XA_UNIT])
+            continue
         for i in range(n):
             chunk = data[i * 2048:(i + 1) * 2048]
             body += make_sector(lbas[name] + i, chunk, 0x89 if i == n - 1 else 0x08)
@@ -132,7 +162,10 @@ def expand(disc, files, directory='/DATA'):
     names = {r[33:33 + r[32]].split(b';')[0].decode() for r in others}
     for name, data in files:
         assert name.upper() not in names, name
-        others.append(_new_record(tmpl, name, lbas[name], len(data)))
+        size = len(data)
+        if name.upper().endswith('.XA'):
+            size = nsectors(name, size) * 2048
+        others.append(_new_record(tmpl, name, lbas[name], size))
     others.sort(key=lambda r: r[33:33 + r[32]])
     out = bytearray()
     for r in dots + others:

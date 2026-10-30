@@ -13,6 +13,13 @@
 
 ; (ZG_CHAR, P1_STRUCT, ZG_MAGIC are defined at the top of xprime.asm)
 
+; step 6: his stage and music (new file ids after PL0B_OBJ / SE_PL0B, build.sh)
+ZG_STFILE equ 0x58              ; his stage (tools/pf_stage.py)
+ZG_XAFILE equ 0x59              ; his music (pf_stage.py music)
+ZG_SONG   equ 47                ; song id = XA player entry
+ZG_XA_CHAN equ 6                ; Pocket Fighter's XA00 channel 6
+ZG_XA_LEN equ 3376              ; its sectors
+
 .org 0x80163CDC
 .area 684, 0
 
@@ -153,6 +160,41 @@ xp_alt_reset:
 	j       0x801245DC
 	sb      zero, lo(XP_ZBITS)(at)
 
+.if ZG_HAVE
+; ---- Zangief's stage (step 6): index 11 ----
+; The four per-stage tables (11 entries each: load, set-up, per-frame,
+; stage objects) and the stage -> song table are copied here with a 12th
+; entry; their readers are repointed (hooks at the end of this file).
+; Zangief's stage loads its own file and otherwise works like Ken's (a
+; still picture, no objects).
+.align 4
+xp_stg_load:                            ; 0x80166728
+	.incbin IN, 0x80166728 - 0x80100000 + 0x800, 11 * 4
+	.word   xp_zstg_load
+xp_stg_init:                            ; 0x80166754
+	.incbin IN, 0x80166754 - 0x80100000 + 0x800, 11 * 4
+	.word   0x80108EE0              ; Ken's
+xp_stg_frame:                           ; 0x80166780
+	.incbin IN, 0x80166780 - 0x80100000 + 0x800, 11 * 4
+	.word   0x80108F2C              ; Ken's (nothing)
+xp_stg_objs:                            ; 0x8016A29C
+	.incbin IN, 0x8016A29C - 0x80100000 + 0x800, 11 * 4
+	.word   0x8016A1AC              ; Ken's (empty list)
+xp_stg_song:                            ; 0x8016D474 (halfwords)
+	.incbin IN, 0x8016D474 - 0x80100000 + 0x800, 11 * 2
+	.halfword ZG_SONG
+
+xp_zstg_load:
+	addiu   sp, sp, -0x18
+	sw      ra, 0x10(sp)
+	jal     0x801043C0
+	li      a0, ZG_STFILE
+	lw      ra, 0x10(sp)
+	addiu   sp, sp, 0x18            ; (load delay: not jr right after lw)
+	jr      ra
+	nop
+.endif
+
 .endarea
 
 ; second area: 0x801639F8-0x80163C24, two more unreferenced functions that
@@ -246,6 +288,7 @@ XP_ZPATTERN:                            ; "Siberian Bear": 3x2 blocks
 	pattern4 3,3,3,2,2,2, 3,3,3,2,2,2, 4,4,4,1,1,1, 4,4,4,1,1,1
 XP_ZBITS:
 	.byte   0                       ; bit 0 P1, bit 1 P2
+
 .endarea
 
 .org 0x80135110
@@ -538,6 +581,50 @@ xp_zpal3:
 @@go:
 	j       0x80108C68
 	nop
+
+.if ZG_HAVE
+; RANDOM stage tickets (from xp_stage): t5 = 13 if a player is Zangief,
+; else 11. Uses t3 (ra), t5-t8 and at.
+xp_zstg_tickets:
+	move    t3, ra
+	li      t6, P1_STRUCT
+	jal     xp_zchar
+	li      t5, 13
+	li      at, 11
+	beq     t7, at, @@ret
+	nop
+	li      t6, P1_STRUCT + 0x2AC   ; P2
+	jal     xp_zchar
+	nop
+	li      at, 11
+	beq     t7, at, @@ret
+	nop
+	li      t5, 11
+@@ret:
+	jr      t3
+	nop
+
+; song -> entry of the XA player (0x801062F4; replaces 0x80106320-0x8010634C,
+; a1 = song, returns v1 = entry). Zangief's song ZG_SONG is its own entry
+; (47, unused) in both the original and the arranged music; the others as
+; vanilla: entry = table[song (+ 24 with the arranged music)].
+xp_songent:
+	li      v1, ZG_SONG
+	beq     a1, v1, @@ret
+	lui     v0, 0x8017
+	lb      v0, -0x357D(v0)         ; arranged music on
+	nop
+	beqz    v0, @@orig
+	move    v1, a1
+	addiu   v1, a1, 0x18
+@@orig:
+	lui     at, 0x8016
+	addu    at, at, v1
+	lb      v1, 0x621C(at)
+@@ret:
+	jr      ra
+	nop
+.endif
 .endarea
 
 ; ============================================================================
@@ -1075,4 +1162,34 @@ XP_ZSEL:
 	nop
 .org 0x8016EFFA                         ; Dan's voice table, unused indices 7/8
 	.byte   14, 15                  ; Zangief's "in trouble" cries (ZG_EVENTS)
+
+; ---- Zangief's stage and music (step 6) ----
+; per-stage tables, repointed to the 12-entry copies
+.org 0x801079A4
+	lui     at, hi(xp_stg_load)
+	addiu   at, at, lo(xp_stg_load)
+.org 0x80107A20
+	lui     at, hi(xp_stg_init)
+	addiu   at, at, lo(xp_stg_init)
+.org 0x80107A94
+	lui     at, hi(xp_stg_frame)
+	addiu   at, at, lo(xp_stg_frame)
+.org 0x8010EDF4
+	lui     at, hi(xp_stg_objs)
+	addiu   at, at, lo(xp_stg_objs)
+.org 0x8012BE6C
+	lui     at, hi(xp_stg_song)
+	addiu   at, at, lo(xp_stg_song)
+; XA player: song -> entry
+.org 0x80106320
+	jal     xp_songent
+	nop
+	.fill   10 * 4, 0
+; entry 47: file index 0xDD (its file id is read from 0x80166060 + 2 * 0xDD
+; = the unused upper half of entry 47 itself), channel 6, looped length
+.org 0x80166218
+	.halfword (0xDD << 8) | ZG_XA_CHAN
+	.halfword ZG_XAFILE
+.org 0x8016606C + 47 * 4
+	.word   0x80000000 | ZG_XA_LEN
 .endif

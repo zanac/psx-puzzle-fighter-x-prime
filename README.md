@@ -77,7 +77,11 @@ See [docs/RESEARCH.md](docs/RESEARCH.md) for the map of the PSX executable.
 
 In Versus, the character select shows a stage line under the grid. **P1** presses **R1** (next) or **L1** (previous), before confirming, to move through:
 
-`NORMAL → RANDOM → MORRIGAN → CHUN-LI → RYU → KEN → HSIEN-KO → DONOVAN → FELICIA → SAKURA → DEVILOT → AKUMA`
+`NORMAL → RANDOM → MORRIGAN → CHUN-LI → RYU → KEN → HSIEN-KO → DONOVAN → FELICIA → SAKURA → DEVILOT → AKUMA → ZANGIEF`
+
+ZANGIEF (Pocket Fighter's castle, with its music) is there only in a build with
+`XP_PF` (see below). RANDOM then includes it, and picks it more often (3 in 13
+instead of 1 in 11) when Zangief plays; NORMAL gives it when P1 is Zangief.
 
 - **RANDOM** is the default. It draws a new stage at every match and never repeats the stage of the previous match.
 - **NORMAL** is the vanilla behaviour: the stage of P1's character.
@@ -134,7 +138,8 @@ Needs `python3` and [armips](https://github.com/Kingcom/armips).
 
 **Experimental (branch `experimental/new-character`): Zangief.** Set `XP_PF`
 to your own Pocket Fighter NTSC-U image (SLUS-00653) to build Zangief's in-match
-graphics, animations and voices from it:
+graphics, animations, voices, his Versus stage (Pocket Fighter's castle) and
+its music from it:
 
 ```sh
 XP_PF="Pocket Fighter.cue" ./build.sh original.pbp xprime [path/to/armips]
@@ -142,7 +147,7 @@ XP_PF="Pocket Fighter.cue" ./build.sh original.pbp xprime [path/to/armips]
 
 Nothing from Pocket Fighter is stored in this repository; the build extracts
 it from your disc. Without `XP_PF` (and with `patch.sh`), Zangief keeps Dan's
-look and voice in the match.
+look and voice in the match, and there is no ZANGIEF stage.
 
 ## How to play the secret characters
 
@@ -192,6 +197,7 @@ P2's L1/R1 do nothing.
 | `tools/previews.py` | redraw the Counter Gem previews from the EXE table |
 | `tools/lzh.py` | codec for the sprite-graphics LZ (decoder `0x8010D5C0`) |
 | `tools/labels.py` | builds the MEI-LING / ANITA select-screen labels in FIRST.EMI |
+| `tools/pf_stage.py` | Zangief's stage and music from Pocket Fighter (castle picture, XA channel) |
 | `src/stage.asm` | Versus stage selector (included by `src/xprime.asm`) |
 | `tools/regress.py` | end-to-end regression in the emulator (screens, damage, secrets) |
 | `tools/model.py` | Python model of the arcade X' damage formula (for tests) |

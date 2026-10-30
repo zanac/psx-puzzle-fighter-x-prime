@@ -4,9 +4,11 @@
 ; the stage brings its own music. In Versus, a line under the character grid
 ;   L1 < STAGE:  NORMAL  > R1
 ; is changed by P1 (until P1 confirms): R1 next, L1 previous:
-;   NORMAL, RANDOM, MORRIGAN .. AKUMA (the 10 stages), NORMAL ...
-; NORMAL is vanilla. RANDOM (the default) draws a stage at every match,
-; never the one of the previous match. The setting lives until the title
+;   NORMAL, RANDOM, MORRIGAN .. AKUMA (the 10 stages), [ZANGIEF], NORMAL ...
+; NORMAL is vanilla (P1's stage; Zangief's own with ZG_HAVE). RANDOM (the
+; default) draws a stage at every match, never the one of the previous
+; match; Zangief's stage (ZG_HAVE) has 3 tickets of 13 when he plays, 1 of
+; 11 otherwise. The setting lives until the title
 ; screen comes back (xp_title resets it to RANDOM). Arcade, Street Puzzle and demo are not touched.
 ;
 ; Code space: 0x801544E4 is a 996-byte function that nothing references
@@ -24,7 +26,7 @@ STAGE_PAL   equ 5
 STAGE_CELL  equ TEXT_MAP + STAGE_COL * 0x78 + STAGE_ROW * 4
 STAGE_TAG   equ (STAGE_PAL << 16) | 0xCC ; 'L' top half: marks our line
 STAGE_LEN   equ 25
-N_SETTINGS  equ 12                      ; NORMAL, RANDOM, 10 stages
+N_SETTINGS  equ 12 + ZG_HAVE            ; NORMAL, RANDOM, 10 stages (+ ZANGIEF)
 
 .org 0x801544E4
 .area 0x801548C8 - 0x801544E4, 0
@@ -148,8 +150,11 @@ xp_stage_erase:
 	nop
 
 ; stage index at match start (replaces "lbu v0, 0x68(s2)" at 0x8012CCE0,
-; returns v0; a0-a2 and s regs preserved; ra is saved by the caller)
+; returns v0; a0-a2 and s regs preserved; ra is saved by the caller).
+; With Zangief's stage (ZG_HAVE) there is an 11th stage, index 11
+; (zangief.asm); 10 stays Dan's (Ken's picture, Dan's music).
 xp_stage:
+	move    t9, ra
 	lbu     v0, 0x68(s2)            ; vanilla: P1's character
 	lui     t0, hi(MODE)
 	lbu     t0, lo(MODE)(t0)
@@ -158,42 +163,67 @@ xp_stage:
 	bne     t0, t1, @@last          ; not Versus: vanilla
 	lbu     t1, 0(t2)
 	nop
-	beqz    t1, @@last              ; NORMAL
+	bnez    t1, @@set
 	addiu   t1, t1, -2
-	bgez    t1, @@last              ; fixed stage
+.if ZG_HAVE
+	jal     xp_zchar                ; NORMAL: P1's character, 11 = Zangief
+	move    t6, s2
+	b       @@last
+	move    v0, t7
+.else
+	b       @@last
+	nop
+.endif
+@@set:
+	bgez    t1, @@pos               ; fixed stage (position 0..N_STAGES-1)
 	move    v0, t1
-	lw      t3, 4(t2)               ; RANDOM: LCG, stirred with the root
-	lui     t4, 0x41C6              ; counters (so it depends on when the
-	ori     t4, t4, 0x4E6D          ; players press the buttons)
-	multu   t3, t4
-	lui     t5, 0x1F80
-	lhu     t6, 0x1100(t5)
-	lhu     t7, 0x1110(t5)
-	mflo    t3
-	addu    t3, t3, t6
-	sll     t7, t7, 16
-	addu    t3, t3, t7
-	addiu   t3, t3, 0x3039
-	sw      t3, 4(t2)
-	srl     t3, t3, 8
-	lbu     t4, 2(t2)               ; stage of the previous match
+.if ZG_HAVE
+	jal     xp_zstg_tickets         ; t5 = 11 tickets, 13 if Zangief plays
+	nop
+.else
 	li      t5, 10
-	sltiu   t6, t4, 10
-	subu    t5, t5, t6              ; 9 choices if there is one, else 10
-	divu    t3, t5
+.endif
+	lw      t3, 4(t2)               ; RANDOM: LCG, stirred with the root
+	lui     t6, 0x1F80              ; counters (so it depends on when the
+	lhu     t7, 0x1100(t6)          ; players press the buttons)
+	lhu     t6, 0x1110(t6)
+	addu    t3, t3, t7
+	sll     t6, t6, 16
+	addu    t3, t3, t6
+	lui     t4, 0x41C6
+	ori     t4, t4, 0x4E6D
+	lbu     t6, 2(t2)               ; position of the previous match's stage
+@@draw:
+	multu   t3, t4
+	mflo    t3
+	addiu   t3, t3, 0x3039
+	srl     t7, t3, 8
+	divu    t7, t5
 	mfhi    v0
-	beqz    t6, @@last
-	sltu    t7, v0, t4
+	sltiu   t7, v0, 10
+	bnez    t7, @@again
+	nop
+	li      v0, 10                  ; tickets 10.. = Zangief's stage
+@@again:
+	beq     v0, t6, @@draw          ; never the previous one
+	nop
+	sw      t3, 4(t2)
+@@pos:                                  ; position 10 = Zangief's stage (11)
+	xori    t7, v0, 10
 	bnez    t7, @@last
 	nop
-	addiu   v0, v0, 1               ; skip the previous stage
-@@last:
-	li      t3, 10                  ; remember the stage used
-	bne     v0, t3, @@keep          ; (Dan, 10, plays on Ken's stage, 3)
+	li      v0, 11
+@@last:                                 ; remember the position used:
+	sltiu   t4, v0, 10              ; Dan (10) plays on Ken's picture (3),
+	bnez    t4, @@keep              ; Zangief's stage (11) is position 10
 	move    t4, v0
-	li      t4, 3
+	xori    t3, v0, 11              ; 10 -> 1, 11 -> 0
+	sll     t4, t3, 3
+	subu    t4, t4, t3
+	li      t3, 10
+	subu    t4, t3, t4              ; 10 - 7 * (v0 == 10)
 @@keep:
-	jr      ra
+	jr      t9
 	sb      t4, 2(t2)
 
 ; ---- character select: Up cycles back (see zangief.asm) ----
@@ -253,19 +283,6 @@ xp_zg_anita_t:
 	j       xp_zg_anita
 	nop
 
-; ---- select setup helpers (CHALLENGE in xprime.asm) ----
-; leaf, v0 only; the caller masks the player's bit after the delay slot
-xp_done:
-	lui     v0, 0x801C
-	lbu     v0, -0x5530(v0)         ; 0x801BAAD0: players done
-	jr      ra
-	nop
-xp_notdone:
-	lui     v0, 0x801C
-	lbu     v0, -0x5530(v0)
-	jr      ra
-	nor     v0, v0, zero
-
 .align 4
 xp_stg_setting:
 	.byte   1                       ; +0 setting (0 NORMAL, 1 RANDOM, 2+ stage)
@@ -280,4 +297,7 @@ xp_stg_names:                           ; 8 characters each, centred
 	.ascii  " NORMAL  RANDOM MORRIGANCHUN-LI "
 	.ascii  "  RYU     KEN   HSIEN-KODONOVAN "
 	.ascii  "FELICIA  SAKURA DEVILOT  AKUMA  "
+.if ZG_HAVE
+	.ascii  "ZANGIEF "
+.endif
 .endarea

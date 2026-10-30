@@ -45,7 +45,13 @@ if [ -n "${XP_PF:-}" ]; then
 	python3 "$HERE/tools/extract.py" "$XP_PF" /SE/SE0AA.PAC "$TMP/SE0AA.PAC"
 	python3 "$HERE/tools/extract.py" "$IN" /DATA/SE_PL0A.EMI "$TMP/SE_PL0A.EMI"
 	python3 "$HERE/tools/zangief.py" voices "$TMP/SE0AA.PAC" "$TMP/SE_PL0A.EMI" "$TMP/SE_PL0B.EMI"
-	NEWFILES="PL0B_OBJ.EMI=$TMP/PL0B_OBJ.EMI SE_PL0B.EMI=$TMP/SE_PL0B.EMI $NEWFILES"
+	# his stage (Pocket Fighter's castle, on Ken's stage file) and music
+	# (new file ids 0x58, 0x59)
+	python3 "$HERE/tools/extract.py" "$XP_PF" /STAGE/ST06.PAC "$TMP/ST06.PAC"
+	python3 "$HERE/tools/extract.py" "$IN" /DATA/STAGE03.EMI "$TMP/STAGE03.EMI"
+	python3 "$HERE/tools/pf_stage.py" "$TMP/ST06.PAC" "$TMP/STAGE03.EMI" "$TMP/ZG_STAGE.EMI"
+	python3 "$HERE/tools/pf_stage.py" music "$XP_PF" "$TMP/ZG_MUSIC.XA"
+	NEWFILES="PL0B_OBJ.EMI=$TMP/PL0B_OBJ.EMI SE_PL0B.EMI=$TMP/SE_PL0B.EMI ZG_STAGE.EMI=$TMP/ZG_STAGE.EMI ZG_MUSIC.XA=$TMP/ZG_MUSIC.XA $NEWFILES"
 	# his name call on the select screen (SELECT.EMI's sound bank)
 	python3 "$HERE/tools/extract.py" "$XP_PF" /SE/SE0D.PAC "$TMP/SE0D.PAC"
 	python3 "$HERE/tools/extract.py" "$IN" /DATA/SELECT.EMI "$TMP/SELECT.EMI"

@@ -247,6 +247,19 @@ xp_labelframe:
 	jr      ra
 	nop
 
+; ---- select setup helpers (CHALLENGE in xprime.asm) ----
+; leaf, v0 only; the caller masks the player's bit after the delay slot
+xp_done:
+	lui     v0, 0x801C
+	lbu     v0, -0x5530(v0)         ; 0x801BAAD0: players done
+	jr      ra
+	nop
+xp_notdone:
+	lui     v0, 0x801C
+	lbu     v0, -0x5530(v0)
+	jr      ra
+	nor     v0, v0, zero
+
 .endarea
 
 ; ============================================================================

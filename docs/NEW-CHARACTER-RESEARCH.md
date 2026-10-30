@@ -112,13 +112,7 @@ Still to do:
 - Pocket Fighter loads files by index through a table of 12-byte entries `(LBA, size, type)`. In RAM it sits at `0x801D0268 − 12 × 0xEE` (the EXE loads at `0x80188A00`).
 - `STAGE/ST00.PAC` is file id `0xEE`; `ST01`–`ST08` follow.
 - Free Battle always loads `ST00` (the "MAX MUM" bar), whatever the characters.
-- There are only 9 stages for 12 characters, so some characters share one. Zangief's home stage is the one Arcade uses against him; finding it is part of step 6.
-
-Not mapped yet:
-- SPF2T stages are 36 sectors each (`STAGEnn.EMI`).
-- Pocket Fighter stages are `STAGE/STnn.PAC`, multi-layer.
-
-A crop of Zangief's Pocket Fighter stage will have to be redrawn into the SPF2T stage format (step 6).
+- There are only 9 stages for 12 characters, so some characters share one. Zangief's is the castle, `ST06` (Moonlight Dark Castle). Both formats are described under step 6.
 
 ## Corrections
 
@@ -334,3 +328,98 @@ New never-run, unreferenced functions:
 - `0x8013BBB4` (308 bytes).
 
 All are checked with coverage over boot, menus, Versus select, VS and a match.
+
+## Step 6: stage and music (done)
+
+Zangief has his own Versus stage: Pocket Fighter's castle, with its music. It is index 11. Index 10 stays Dan's (Ken's picture, Dan's music).
+
+### SPF2T stage file (`DATA/STAGEnn.EMI`, 36 sectors)
+
+An EMI with 5 entries. For each entry the header holds the size, the parameters and **the first 4 bytes of the entry's data**. The loader checks those 4 bytes: if they do not match, the load never ends and the game hangs on the VS screen.
+
+| Entry | Size | Content |
+|---|---|---|
+| 0 | 0x8000 | VRAM page (768, 256): 256 tiles of 16×16, 4bpp, 16 per row |
+| 1 | 0x8000 | VRAM page (832, 256): 64×64 rock texture of the well frames (top left) |
+| 2 | 0x300 | tile map, 24 × 16 halfwords: tile (bits 0–7) \| palette << 8 |
+| 3 | 0x400 | 32 palettes, bank 1 (`0x801A0A2C`) |
+| 4 | 0x400 | 32 palettes, bank 2 |
+
+- **Picture.** Rows 0–5 of the map are the 384×96 picture the match shows. It is placed at x −10, y 80 and seen through the middle area and, dimmed, the wells. Tests with a numbered grid showed nothing of rows 6–15 in a match.
+- **Reserved palettes.** Bank-1 palette 15 is the frame rock's palette (no stage uses 15 in its picture). The stages use at most 0–28.
+- **Entry 2 on load.** It goes to `0x800F5600`. `0x80108CF4` / `0x80108D2C` copy it to `0x8019FEB8` and `0x801A01B8`.
+
+### Stage tables and readers
+
+`STAGE_IDX` (`0x8019FC98`, halfword) has only five readers (watched over a full match):
+
+| Reader | Table | Role |
+|---|---|---|
+| `0x80107944` | `0x80166728` | load function |
+| `0x801079DC` | `0x80166754` | set-up function |
+| `0x80107A50` | `0x80166780` | per-frame function |
+| `0x8010EDD8` | `0x8016A29C` | stage object list |
+| `0x8012BE54` | `0x8016D474` | song (halfwords) |
+
+- Each table has 11 entries, with no room for a 12th.
+- They are copied with entry 11 added (Zangief's load function, then Ken's set-up, per-frame and empty object list), and the five readers are repointed.
+- The "loaded stage" cache is `0x801BF114`.
+
+### XA music
+
+- **Call.** `0x80106284(cmd, song)` → `0x801062F4`.
+- **Song to entry.** entry = `0x8016621C[song]`, or `[song + 24]` with the arranged music.
+- **Entry fields:**
+  - `0x8016615C[entry]` (4 bytes per entry; the halfword holds file index << 8 | channel);
+  - file id = `0x80166060[file index]` (halfwords: 5–10 = `STR/ORG00–02`, `QSD00–02`);
+  - `0x8016606C[entry]`: length in sectors per channel, top bit = loop;
+  - `0x8016612C[entry]`: volume.
+- **Playback.** Start = file LBA + channel, end = start + 8 × length.
+- **SPF2T's XA format.** The same as Pocket Fighter's: 8 interleaved channels, one song each, stereo 37.8 kHz, file number 1.
+- **Free slot.** All 48 song ids are used: 0–23 are songs, 24–47 their arranged versions, and song 23 maps to entry 11 in both cases. **Entry 47** is unused.
+- **Zangief's song.**
+  - It is song id 47. `xp_songent` returns entry 47 for it, original or arranged.
+  - Entry 47 is set to file index `0xDD` and channel 6. Its file id is read from `0x80166060 + 2 × 0xDD` = `0x8016621A`, the unused upper half of entry 47 itself.
+  - Its length is 3376 sectors, looped.
+
+### Pocket Fighter stage file (`STAGE/STnn.PAC`)
+
+- **Type 5:** palettes.
+- **Type 6:** tile map in blocks of 16×16 entries (256×256 px), row-major. Entry: tile = bits 0–10, palette = bits 11–15 plus the layer's base.
+- **Type 257:** 16×16 4bpp tiles.
+- **Types 0, 1, 264:** stage sprites (the witch silhouette, for example).
+- **ST06 in a match.** The match shows three layers, two blocks each, side by side:
+  - sky and moon: blocks 12–13, palette base 64, y −10;
+  - floating castle: blocks 2–3, base 0, y −9;
+  - statue, steps and wagon: blocks 6–7, base 32, y −8.
+- **How the layout was found.** It was read from the game's display list in RAM: 16×16 sprite packets (GP0 `0x7C`), each tile and CLUT matched back to the PAC.
+
+### Pocket Fighter music
+
+`KYOKU/XA00.XA` (LBA 201): channel n is the music of stage n. The castle's is channel 6: 3376 sectors, about 3 minutes.
+
+### Build (`tools/pf_stage.py`)
+
+- **Picture.**
+  - The three layers are composed (512×256), scaled to 75 % and cropped at y 36. This is the crop with the floating castle's islands, chosen by the user.
+  - Quantised to 28 palettes of 16 colours (k-means), 144 tiles.
+  - Written over Ken's stage file. The frame rock texture is kept, with its palette recoloured lilac (chosen by the user).
+- **Music.** Pocket Fighter's XA00 is copied sector by sector up to the last sector of channel 6, with the other channels zeroed and silent sectors up to the player's end. That is 27,022 sectors (about 63 MB on the disc, mostly silence).
+- **New files.** `ZG_STAGE.EMI` (id 0x58) and `ZG_MUSIC.XA` (id 0x59).
+- **`tools/discexpand.py`.** It writes a `*.XA` file as raw Form 2 sectors, with 16 empty data sectors before it.
+
+### Selector
+
+- **NORMAL.** Zangief as P1 plays on his stage.
+- **Fixed entry.** ZANGIEF is a fixed entry after AKUMA.
+- **RANDOM.** Zangief's stage has 1 ticket in 11. With a Zangief in the match it has 3 in 13 (`xp_zstg_tickets`). The previous stage is still never repeated.
+- **Without `XP_PF`.** There is no 11th stage: the code is assembled out (`ZG_HAVE`).
+
+### Bug found on the way
+
+`xp_zstg_load` first ended with `lw ra` directly followed by `jr ra`. On the R3000 the loaded value is not available to the next instruction, so the function returned to the old `ra` (its own `jal`). That started the load twice, and the VS screen hung. The fix is an instruction between the two.
+
+### Code space
+
+- **New space:** the rest of `0x80163CDC` (tables and the load function).
+- **Moved:** `xp_done` and `xp_notdone`, to the X' area at `0x80134D80`, to make room for `xp_stage`.
