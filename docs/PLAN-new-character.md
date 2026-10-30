@@ -1,6 +1,12 @@
 # Plan: Zangief from Pocket Fighter as a hidden character
 
-Branch: `experimental/new-character`. Status: **plan, nothing implemented yet.**
+Branch: `experimental/new-character`. Status: **step 0 (research) in progress.**
+
+## Decisions (agreed)
+
+- Only the NTSC-U Pocket Fighter (SLUS-00653) is supported.
+- No Arcade and no ending: Zangief is **not selectable in Arcade**, only in Versus.
+- **Option B** (alternate on an existing slot) is fine, provided it covers everything, his own stage background and music included.
 
 ## Goal
 
@@ -117,11 +123,9 @@ Branch: `experimental/new-character`. Status: **plan, nothing implemented yet.**
 - Convert Zangief's Pocket Fighter stage to the SPF2T stage format. The stage selector gets a ZANGIEF entry.
 - Put his theme in a new XA file and point the stage's music at it.
 
-### Step 7: Arcade and the rest
+### Step 7: Arcade lock-out
 
-- CPU behaviour (AI) when you face him.
-- Arcade order and ending: reuse a generic ending, or skip.
-- RESULT screen row (choice A only).
+- Zangief cannot be picked in Arcade (the Down cycle skips him there). No ending, no Arcade order. Street Puzzle is not affected.
 
 ### Step 8: packaging
 
@@ -136,8 +140,3 @@ Branch: `experimental/new-character`. Status: **plan, nothing implemented yet.**
 - **Memory.** A character must fit SPF2T's buffers and VRAM, for both players at once.
 - **Choice A.** There are many hidden per-character tables, and any one we miss is a crash or a wrong value.
 
-## Questions for you
-
-1. Your Pocket Fighter image is the NTSC-U one (SLUS-00653). Is that the one to support?
-2. Is the scope complete (sprites, voices, portraits, stage, music, Arcade)? Can Arcade and the ending come last, or be skipped?
-3. Is A or B fine to decide after step 0, with B recommended if the alternate path is complete?
