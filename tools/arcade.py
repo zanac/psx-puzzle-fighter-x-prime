@@ -72,9 +72,10 @@ def build(spf2t, sgemf, out, verbose=True):
               'data': [os.path.join(XP, 'data_03.patch.s')] + srcs(SRC, 'data'),
               'xp04': [os.path.join(XP, 'data_04.patch.s')]}   # KScl's pzf.04 file offsets
     patches, syms = cps2patch.assemble(groups)
+    # opcodes are encrypted only below 0x80000 (the key's range): code above
+    # that, in pzf.04, goes in as it is, like data
     code03 = [p for p in patches['code'] if p[0] < 0x80000]
-    if [p for p in patches['code'] if p[0] >= 0x80000]:
-        raise SystemExit('code blocks above 0x80000 belong in a data_ file (pzf.04 is not encrypted)')
+    patches['data'] += [p for p in patches['code'] if p[0] >= 0x80000]
     dec = cps2crypt.decrypt(r['pzfe.03'], key)
     dec = cps2patch.put(dec, 0, code03)
     p03 = cps2crypt.encrypt(dec, key)

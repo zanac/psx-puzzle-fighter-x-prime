@@ -5,7 +5,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import lr
 
 class Hit(C.Structure):
-    _fields_ = [('pc', C.c_uint32), ('frame', C.c_uint32), ('d', C.c_uint32 * 8), ('a', C.c_uint32 * 8)]
+    _fields_ = [('kind', C.c_uint32), ('pc', C.c_uint32), ('frame', C.c_uint32), ('addr', C.c_uint32),
+                ('value', C.c_uint32), ('size', C.c_uint32), ('d', C.c_uint32 * 8), ('a', C.c_uint32 * 8)]
 
 # CPS2 inputs through the RetroPad (mame2003-plus defaults)
 COIN, START = lr.SELECT, lr.START
@@ -36,12 +37,16 @@ class Emu(lr.Emu):
         for i, x in enumerate(data): self.w8(a + i, x)
     def ram(self): return self.rbytes(0xff0000, 0x10000)
     def bp(self, pc): return self.lib.xdbg_add_bp(C.c_uint32(pc))
+    def watch(self, lo, hi, kind=3):
+        """kind: 1 reads, 2 writes, 3 both"""
+        return self.lib.xdbg_add_watch(C.c_uint32(lo), C.c_uint32(hi), C.c_uint32(kind))
     def dbg(self, on=True): pass
     def dbg_clear(self): self.lib.xdbg_clear()
     def log(self, clear=True):
         out = []
         for i in range(self.lib.xdbg_hits()):
             h = self.lib.xdbg_hit(i)[0]
-            out.append(dict(pc=h.pc, frame=h.frame, d=list(h.d), a=list(h.a)))
+            out.append(dict(kind=('bp', 'r', 'w')[h.kind], pc=h.pc, frame=h.frame, addr=h.addr, value=h.value,
+                            size=h.size, d=list(h.d), a=list(h.a)))
         if clear: self.lib.xdbg_clear_hits()
         return out

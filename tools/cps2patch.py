@@ -3,7 +3,8 @@
 A source file is a list of blocks, each one introduced by
     | !!! INSERT AT: <hex address>
     | !!! LENGTH: 0x<hex length>
-and followed by GNU as (m68k) code or data. Each block is linked at its own
+and followed by GNU as (m68k) code or data. Lines before the first block
+(.set, .macro) are seen by every block of the file. Each block is linked at its own
 address, so absolute references (jsr label, lea label.l) work, also across
 blocks and files: the labels of every block are visible to every other.
 A block shorter than its LENGTH is padded with NOPs; a longer one is an error.
@@ -18,7 +19,7 @@ LEN = re.compile(r'^\s*\|\s*!!!\s*LENGTH:\s*\$?(?:0x)?([0-9A-Fa-f]+)')
 
 def blocks(path):
     """[(address, length, text, origin)] of one source file"""
-    out, cur = [], None
+    out, cur, pre = [], None, []
     for n, line in enumerate(open(path), 1):
         m = STA.match(line)
         if m:
@@ -28,11 +29,11 @@ def blocks(path):
             cur[1] = int(m.group(1), 16); continue
         if cur is not None:
             cur[2].append(line)
-        elif line.strip() and not line.strip().startswith('|'):
-            raise SystemExit('%s:%d: code before the first INSERT AT' % (path, n))
+        else:
+            pre.append(line)        # definitions (.set, .macro) shared by every block
     for b in out:
         if b[1] is None: raise SystemExit('%s: block without LENGTH' % b[3])
-    return [(a, l, ''.join(t), o) for a, l, t, o in out]
+    return [(a, l, ''.join(pre) + ''.join(t), o) for a, l, t, o in out]
 
 def _run(cmd):
     r = subprocess.run(cmd, capture_output=True, text=True)

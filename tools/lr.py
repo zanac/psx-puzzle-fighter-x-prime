@@ -79,7 +79,7 @@ class Emu:
         self._audiob = AUDIOB_CB(self._audio_cb)
         self._poll = POLL_CB(lambda: None)
         self._state = STATE_CB(self._state_cb)
-        self._logf = LOG_CB(lambda lvl, fmt: print('[core]', fmt.decode(errors='replace').rstrip()) if (verbose or lvl >= 2) else None)
+        self._logf = LOG_CB(lambda lvl, fmt: print('[core]', fmt.decode(errors='replace').rstrip()) if (verbose or (lvl >= 2 and not os.environ.get('LR_QUIET'))) else None)
         L = self.lib
         L.retro_set_environment(self._env)
         L.retro_set_video_refresh(self._video)
