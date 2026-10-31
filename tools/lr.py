@@ -94,12 +94,13 @@ class Emu:
         L.retro_serialize_size.restype = C.c_size_t
         L.retro_get_memory_data.restype = C.c_void_p
         L.retro_get_memory_size.restype = C.c_size_t
-        L.xdbg_log.restype = C.POINTER(xdbg_entry)
-        L.xdbg_log_count.restype = C.c_uint32
-        L.xdbg_cov_enable.restype = C.POINTER(C.c_uint32)
-        L.xdbg_regs.restype = C.POINTER(C.c_uint32)
-        L.xdbg_pc.restype = C.c_uint32
-        L.xdbg_snap.restype = C.POINTER(C.c_uint8)
+        if hasattr(L, 'xdbg_log'):          # the patched pcsx_rearmed (PSX debugging)
+            L.xdbg_log.restype = C.POINTER(xdbg_entry)
+            L.xdbg_log_count.restype = C.c_uint32
+            L.xdbg_cov_enable.restype = C.POINTER(C.c_uint32)
+            L.xdbg_regs.restype = C.POINTER(C.c_uint32)
+            L.xdbg_pc.restype = C.c_uint32
+            L.xdbg_snap.restype = C.POINTER(C.c_uint8)
         self._snaplen = 0
         self.ram_ptr = L.retro_get_memory_data(2)
         self.ram_size = L.retro_get_memory_size(2)
@@ -150,7 +151,7 @@ class Emu:
     # ---- control ----
     def run(self, n=1):
         for _ in range(n):
-            self.lib.xdbg_set_frame(self.frames)
+            if hasattr(self.lib, "xdbg_set_frame"): self.lib.xdbg_set_frame(self.frames)
             self.lib.retro_run()
             self.frames += 1
 

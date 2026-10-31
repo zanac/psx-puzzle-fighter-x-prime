@@ -1,0 +1,82 @@
+"""Build the arcade set spf2enh.zip (CPS2) from your own MAME sets.
+
+usage: arcade.py spf2t.zip sgemf.zip OUT.zip
+
+spf2t.zip: Super Puzzle Fighter II Turbo (Euro 960529) - parent set, split or merged
+sgemf.zip: Super Gem Fighter Mini Mix / Pocket Fighter - Zangief's graphics and sound
+Only the program and graphics of the hack come out of this script: every
+byte of game data is taken from your sets."""
+import sys, os, zipfile, zlib, tempfile
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import cps2crypt, cps2patch
+
+HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+XP = os.path.join(HERE, 'arcade', 'xprime')
+SRC = os.path.join(HERE, 'arcade', 'src')
+
+SPF2T = {   # name: crc32 (MAME spf2t)
+    'pzfe.03': 0x2af51954, 'pzf.04': 0xb80649e2, 'pzf.14m': 0x2d4881cb, 'pzf.16m': 0x4b0fd1be,
+    'pzf.18m': 0xe43aac33, 'pzf.20m': 0x7f536ff1, 'pzf.01': 0x600fb2a3, 'pzf.02': 0x496076e0,
+    'pzf.11m': 0x78442743, 'pzf.12m': 0x399d2c7b, 'spf2t.key': 0x4c4dc7e3}
+SGEMF = {}  # filled in when Zangief's data is taken from it
+
+def read_set(path, want):
+    """{name: bytes} found by CRC (any folder, any name) or by name"""
+    z = zipfile.ZipFile(path); got = {}
+    bycrc = {i.CRC: i for i in z.infolist()}
+    for name, crc in want.items():
+        i = bycrc.get(crc)
+        if i is None:
+            raise SystemExit('%s: %s (crc %08x) not found' % (path, name, crc))
+        got[name] = z.read(i)
+    return got
+
+def ips(data, p):
+    data = bytearray(data); assert p[:5] == b'PATCH'; i = 5
+    while p[i:i + 3] != b'EOF':
+        off = int.from_bytes(p[i:i + 3], 'big'); n = int.from_bytes(p[i + 3:i + 5], 'big'); i += 5
+        if n == 0:
+            rn = int.from_bytes(p[i:i + 2], 'big'); data[off:off + rn] = bytes([p[i + 2]]) * rn; i += 3
+        else:
+            data[off:off + n] = p[i:i + n]; i += n
+    return bytes(data)
+
+def srcs(d, kind):
+    return sorted(os.path.join(d, f) for f in os.listdir(d) if f.endswith('.s') and f.startswith(kind)) if os.path.isdir(d) else []
+
+def build(spf2t, sgemf, out, verbose=True):
+    r = read_set(spf2t, SPF2T)
+    key = r['spf2t.key']
+    # program: X' (KScl) then X" (arcade/src). code_* blocks are opcodes of the
+    # encrypted pzfe.03 (patched decrypted, then encrypted again); data_* blocks
+    # are read as data and go in as they are; pzf.04 (0x80000-) is not encrypted.
+    groups = {'code': [os.path.join(XP, 'code_03.patch.s')] + srcs(SRC, 'code'),
+              'data': [os.path.join(XP, 'data_03.patch.s')] + srcs(SRC, 'data'),
+              'xp04': [os.path.join(XP, 'data_04.patch.s')]}   # KScl's pzf.04 file offsets
+    patches, syms = cps2patch.assemble(groups)
+    code03 = [p for p in patches['code'] if p[0] < 0x80000]
+    if [p for p in patches['code'] if p[0] >= 0x80000]:
+        raise SystemExit('code blocks above 0x80000 belong in a data_ file (pzf.04 is not encrypted)')
+    dec = cps2crypt.decrypt(r['pzfe.03'], key)
+    dec = cps2patch.put(dec, 0, code03)
+    p03 = cps2crypt.encrypt(dec, key)
+    p03 = cps2patch.put(p03, 0, [p for p in patches['data'] if p[0] < 0x80000])
+    p04 = cps2patch.put(r['pzf.04'], 0, patches['xp04'])
+    p04 = cps2patch.put(p04, 0x80000, [p for p in patches['data'] if p[0] >= 0x80000])
+    files = {'pzfen.03': p03, 'pzfen.04': p04}
+    for g in ('14m', '16m', '18m', '20m'):
+        files['pzfen.' + g] = ips(r['pzf.' + g], open(os.path.join(XP, 'gfx', 'pzf-%s.ips' % g), 'rb').read())
+    for n in ('pzf.01', 'pzf.02', 'pzf.11m', 'pzf.12m', 'spf2t.key'):
+        files[n] = r[n]
+    zf = zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED)
+    for n in sorted(files):
+        zi = zipfile.ZipInfo(n, (1996, 12, 24, 23, 32, 0)); zi.compress_type = zipfile.ZIP_DEFLATED
+        zf.writestr(zi, files[n])
+    zf.close()
+    if verbose:
+        for n in sorted(files): print('%-10s %7x  crc %08x' % (n, len(files[n]), zlib.crc32(files[n])))
+    return files
+
+if __name__ == '__main__':
+    if len(sys.argv) != 4: sys.exit(__doc__)
+    build(*sys.argv[1:])
