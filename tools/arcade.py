@@ -6,9 +6,9 @@ spf2t.zip: Super Puzzle Fighter II Turbo (Euro 960529) - parent set, split or me
 sgemf.zip: Super Gem Fighter Mini Mix / Pocket Fighter - Zangief's graphics and sound
 Only the program and graphics of the hack come out of this script: every
 byte of game data is taken from your sets."""
-import sys, os, zipfile, zlib, tempfile
+import sys, os, zipfile, zlib, tempfile, struct
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import cps2crypt, cps2patch, cps2gfx, cps2preview, cps2label, arcade_zangief
+import cps2crypt, cps2patch, cps2gfx, cps2preview, cps2label, cps2icons, arcade_zangief
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 XP = os.path.join(HERE, 'arcade', 'xprime')
@@ -48,6 +48,7 @@ def ips(data, p):
 def swap(b): return bytes(x for i in range(0, len(b), 2) for x in (b[i + 1], b[i]))
 
 ZNAME = 0x9F000             # ZANGIEF's two HUD name lists (code_zangief.s)
+ZICONS = 0x9F100            # select icons: palettes and tile codes (code_select.s)
 
 def scroll1_art(r, gfx, p03, p04):
     """new scroll1 pictures (gfx list changed in place): Dan's Counter Gem preview
@@ -100,8 +101,16 @@ def build(spf2t, sgemf, out, verbose=True):
     pfgfx = cps2gfx.Gfx(groups=[(0, [s['pcf.13m'], s['pcf.15m'], s['pcf.17m'], s['pcf.19m']]),
                                (0x1000000, [s['pcf.14m'], s['pcf.16m'], s['pcf.18m'], s['pcf.20m']])])
     zblob, ztiles = arcade_zangief.build(pfprog, pfgfx, verbose)
+    # the new select icons: tiles after his, codes and palettes at ZICONS
+    zi, zp = cps2icons.zangief(pfgfx, pfprog)
+    di, dp = cps2icons.dan(cps2gfx.Gfx(gfx), swap(p03) + swap(p04))
     del pfgfx
-    p04 = cps2patch.put(p04, 0x80000, [(arcade_zangief.ZBLOB, zblob)])
+    codes = []
+    for idx in (zi, di):
+        for t in cps2icons.tiles_of(idx):
+            codes.append(arcade_zangief.TILE0 + len(ztiles)); ztiles.append(t)
+    icons = struct.pack('>16H', *zp) + struct.pack('>16H', *dp) + struct.pack('>18H', *codes)
+    p04 = cps2patch.put(p04, 0x80000, [(arcade_zangief.ZBLOB, zblob), (ZICONS, icons)])
     files = {'pzfen.03': p03, 'pzfen.04': p04}
     for g, data in zip(('13m', '15m', '17m', '19m'), arcade_zangief.gfx_roms(ztiles)):
         files['pzfen.' + g] = data

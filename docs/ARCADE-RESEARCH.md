@@ -31,7 +31,7 @@ then the X" patches in `arcade/src`. These notes record what is known about the
 
 - a5 = 0xFF8000 throughout.
 - Player structs: P1 0xFF8300, P2 0xFF8700 (+0x82 character, +0x3F6 a copy).
-- Select cursors: P1 0xFF8C82 (+0 character, +1 position), P2 0xFF8C86.
+- Select cursors: P1 0xFF0C82 (+0 character, +1 position), P2 0xFF0C86 (a5 - 0x737E).
 - Select/fighter objects: P1 0xFF8B00, P2 0xFF8C00 (+0x82 character, +0x1C animation
   entry pointer, +0x18 duration/flags, +0x9A buttons held, +0x9C previous).
   Buttons: bits 0-3 directions (1 R, 2 L, 4 D, 8 U), 0x100 / 0x200 buttons 1 / 2,

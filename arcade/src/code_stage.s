@@ -58,6 +58,7 @@ jsr    xp_stage
 | fp = select object of the player (P1 0xFF8B00); every register but d2 kept
 xp_selkey:
 movem.l %d0-%d7/%a0-%a5, -(%sp)
+jsr    xp_selz                      | code_select.s: Zangief bit, icons
 tst.b  A5 + 0xE0                    | VS HUMAN (0 in VS COM, also when a challenger comes)
 beq.b  sk_out
 move.b #2, XP_SHOW                  | the line stays while anybody chooses
