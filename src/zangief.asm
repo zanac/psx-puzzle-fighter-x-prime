@@ -19,6 +19,7 @@ ZG_STFILE equ 0x58              ; his stage (tools/pf_stage.py)
 ZG_XAFILE equ 0x59              ; his music (pf_stage.py music)
 ZG_SONG   equ 47                ; song id = XA player entry
 ZG_XA_CHAN equ 6                ; Pocket Fighter's XA00 channel 6
+ZG_RMX_CHAN equ ZG_XA_CHAN + 1  ; the remix (or a copy of channel 6), pf_stage.py music
 ZG_XA_LEN equ 3376              ; its sectors
 ; step 7: the staff roll figure
 ZG_ENDFILE equ 0x5A                     ; ZG_END.EMI (build.sh)
@@ -199,6 +200,18 @@ xp_zstg_load:
 	jr      ra
 	nop
 
+
+; Zangief's song (from xp_songent: v1 = entry 47, v0 = 0x80170000): entry 47
+; plays channel ZG_XA_CHAN of ZG_MUSIC.XA, or ZG_RMX_CHAN (= + 1, the remix)
+; with the arranged music on
+xp_zsong:
+	lb      v0, -0x357D(v0)         ; arranged music on
+	li      at, (0xDD << 8) | ZG_XA_CHAN
+	sltu    v0, zero, v0
+	addu    at, at, v0
+	lui     v0, 0x8016
+	jr      ra
+	sh      at, 0x6218(v0)          ; entry 47's file index and channel
 .endarea
 
 ; second area: 0x801639F8-0x80163C24, two more unreferenced functions that
@@ -609,11 +622,13 @@ xp_zstg_tickets:
 
 ; song -> entry of the XA player (0x801062F4; replaces 0x80106320-0x8010634C,
 ; a1 = song, returns v1 = entry). Zangief's song ZG_SONG is its own entry
-; (47, unused) in both the original and the arranged music; the others as
-; vanilla: entry = table[song (+ 24 with the arranged music)].
+; (47, unused) in both the original and the arranged music: channel
+; ZG_XA_CHAN of ZG_MUSIC.XA (Pocket Fighter's castle), or ZG_RMX_CHAN with
+; the arranged music on (the remix, tools/remix.py; the same length); the
+; others as vanilla: entry = table[song (+ 24 with the arranged music)].
 xp_songent:
 	li      v1, ZG_SONG
-	beq     a1, v1, @@ret
+	beq     a1, v1, xp_zsong        ; (at the end of the 0x80163CDC block)
 	lui     v0, 0x8017
 	lb      v0, -0x357D(v0)         ; arranged music on
 	nop
@@ -624,7 +639,6 @@ xp_songent:
 	lui     at, 0x8016
 	addu    at, at, v1
 	lb      v1, 0x621C(at)
-@@ret:
 	jr      ra
 	nop
 .endarea

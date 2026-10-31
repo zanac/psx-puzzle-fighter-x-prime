@@ -37,7 +37,7 @@ tools/discexpand.py writes for a *.XA file.
 
 usage: pf_stage.py ST06.PAC TEMPLATE_STAGE.EMI OUT.EMI [--scale S] [--top Y]
        [--left X] [--png PREVIEW.png]
-       pf_stage.py music PF_IMAGE OUT.XA
+       pf_stage.py music PF_IMAGE OUT.XA [REMIX.wav]
 """
 import os, struct, sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -200,8 +200,9 @@ def build(pac, template, scale=DEF_SCALE, top=DEF_TOP, left=DEF_LEFT, png=None):
     return bytes(out), len(uniq)
 
 XA_PATH, XA_CHANNEL = '/KYOKU/XA00.XA', 6
+RMX_CHANNEL = 7
 
-def build_music(pf_image):
+def build_music(pf_image, remix=None):
     """-> (2336-byte units, sectors of the song)"""
     import discout, discpatch as D
     img = discout.load(pf_image).img
@@ -218,11 +219,33 @@ def build_music(pf_image):
     end = mine[0] + 8 * len(mine) + 8
     pad = bytes([1, 7, 0x64, 1]) * 2 + bytes(2328)
     out += pad * (end - len(out) // 2336)
+    # channel 7 (an unused song of XA00, now silent) gets the remix, played
+    # with the arranged music on (src/zangief.asm xp_songent), or else a copy
+    # of channel 6: the same number of sectors either way
+    def chan(c):
+        return [i for i in range(len(out) // 2336)
+                if out[i * 2336 + 1] == c and out[i * 2336 + 2] & 4]
+    src, dst = chan(XA_CHANNEL), chan(RMX_CHANNEL)
+    assert len(dst) >= len(src) == len(mine)
+    if remix is not None:
+        import xa
+        bodies = xa.encode(remix)[:len(src)]
+        bodies += [bytes(2304)] * (len(src) - len(bodies))
+    else:
+        bodies = [bytes(out[i * 2336 + 8:i * 2336 + 8 + 2304]) for i in src]
+    for i, b in zip(dst, bodies):
+        out[i * 2336 + 8:i * 2336 + 8 + 2304] = b
     return bytes(out), len(mine)
 
 def main(a):
     if a[0] == 'music':
-        data, n = build_music(a[1])
+        remix = None
+        if len(a) > 3:
+            import wave, numpy as np
+            w = wave.open(a[3])
+            assert w.getframerate() == 37800 and w.getnchannels() == 2
+            remix = np.frombuffer(w.readframes(w.getnframes()), np.int16).reshape(-1, 2)
+        data, n = build_music(a[1], remix)
         open(a[2], 'wb').write(data)
         print('%s: %d sectors, song %d sectors' % (a[2], len(data) // 2336, n))
         return

@@ -22,20 +22,26 @@ _K0 = np.array(K0)[_F]
 _K1 = np.array(K1)[_F]
 _SC = (1 << _R) / 4096.0
 
-def _unit(x, p1, p2):
-    """best (error, filter, range, nibbles, p1, p2) for 28 samples; all
-    52 filter/range pairs at once"""
-    q1 = np.full(52, p1, np.int64); q2 = np.full(52, p2, np.int64)
-    err = np.zeros(52); nib = np.empty((28, 52), np.int64)
+def _units(x, prev):
+    """the best filter / range for 28 samples of both channels at once (all
+    52 pairs): x (28, 2), prev [[p1, p2], [p1, p2]] -> (params, nibbles,
+    new prev)"""
+    q1 = np.array([[prev[c][0]] * 52 for c in range(2)], np.int64)
+    q2 = np.array([[prev[c][1]] * 52 for c in range(2)], np.int64)
+    err = np.zeros((2, 52)); nib = np.empty((28, 2, 52), np.int64)
+    xs = x.astype(np.int64)
     for i in range(28):
         pred = (q1 * _K0 + q2 * _K1 + 32) >> 6
-        n = np.clip(np.rint((int(x[i]) - pred) * _SC), -8, 7).astype(np.int64)
-        s = np.clip(((n << 12) >> _R) + pred, -32768, 32767)
-        err += (s - int(x[i])) ** 2.0
+        d = xs[i][:, None] - pred
+        n = np.clip(np.rint(d * _SC), -8, 7).astype(np.int64)
+        v = np.clip(((n << 12) >> _R) + pred, -32768, 32767)
+        err += (v - xs[i][:, None]) ** 2.0
         nib[i] = n & 15
-        q2, q1 = q1, s
-    k = int(np.argmin(err))
-    return err[k], int(_F[k]), int(_R[k]), nib[:, k], int(q1[k]), int(q2[k])
+        q2, q1 = q1, v
+    k = np.argmin(err, 1)
+    params = [int(_F[k[c]]) << 4 | int(_R[k[c]]) for c in range(2)]
+    nibs = [nib[:, c, k[c]] for c in range(2)]
+    return params, nibs, [[int(q1[c, k[c]]), int(q2[c, k[c]])] for c in range(2)]
 
 def encode(pcm):
     """pcm: int16 array (N, 2) at 37800 Hz -> list of 2304-byte sector bodies"""
@@ -50,18 +56,15 @@ def encode(pcm):
         for g in range(GROUPS):
             base = s0 + g * 112
             params = [0] * 8; nibs = [None] * 8
-            for u in range(8):
-                ch = u & 1
-                x = pcm[base + (u >> 1) * 28: base + (u >> 1) * 28 + 28, ch]
-                err, f, r, nb, q1, q2 = _unit(x, prev[ch][0], prev[ch][1])
-                prev[ch] = [q1, q2]
-                params[u] = f << 4 | r; nibs[u] = nb
+            for j in range(4):
+                p, nb, prev = _units(pcm[base + 28 * j:base + 28 * j + 28], prev)
+                params[2 * j], params[2 * j + 1] = p
+                nibs[2 * j], nibs[2 * j + 1] = nb
             grp = bytearray(128)
             grp[0:4] = bytes(params[0:4]); grp[4:8] = bytes(params[0:4])
             grp[8:12] = bytes(params[4:8]); grp[12:16] = bytes(params[4:8])
-            for i in range(28):
-                for j in range(4):
-                    grp[16 + 4 * i + j] = int(nibs[2 * j][i]) | int(nibs[2 * j + 1][i]) << 4
+            data = (np.stack(nibs[0::2], 1) | (np.stack(nibs[1::2], 1) << 4)).astype(np.uint8)
+            grp[16:128] = data.tobytes()
             sec += grp
         out.append(bytes(sec))
     return out
