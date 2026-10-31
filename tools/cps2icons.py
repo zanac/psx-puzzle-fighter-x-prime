@@ -84,6 +84,30 @@ ZG_PORT_PALS = {0: 0x20D008, 1: 0x20D028, 2: 0x20D048}
 PORT_W, PORT_H = 128, 112
 PORT_SCALE = 0.62
 
+def pf_portrait_rgba(pfgfx, pfprog):
+    """Pocket Fighter's select portrait of Zangief (full body), RGBA, cropped"""
+    import pfarc
+    P = pfarc.PF(pfprog, pfgfx)
+    img, pal = P.render(ZG_PORTRAIT, bank=1, size=600, ox=200, oy=200)
+    out = np.zeros((600, 600, 4), np.uint8)
+    for p, a in ZG_PORT_PALS.items():
+        m = pal == p
+        out[m, :3] = rgb_of(struct.unpack('>16H', pfprog[a:a + 32]))[img[m]]
+        out[m, 3] = 255
+    ys, xs = np.nonzero(pal >= 0)
+    return out[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+
+# --- WINNER screen picture (full body, about as wide as the others (Ryu ~130 pixels)) -------
+WIN_SCALE = 0.72
+
+def zangief_winner(pfgfx, pfprog):
+    """index image (15 = transparent) and palette words"""
+    from PIL import Image
+    im = Image.fromarray(pf_portrait_rgba(pfgfx, pfprog), 'RGBA')
+    im = im.resize((round(im.width * WIN_SCALE), round(im.height * WIN_SCALE)), Image.LANCZOS)
+    a = np.array(im)
+    return quantise(a[..., :3], a[..., 3] > 128)
+
 def zangief_portrait(pfgfx, pfprog):
     """index image 128x112 (15 = transparent) and its palette words"""
     import pfarc

@@ -9,7 +9,7 @@ byte of game data is taken from your sets."""
 import sys, os, zipfile, zlib, tempfile, struct
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import cps2crypt, cps2patch, cps2gfx, cps2preview, cps2label, cps2icons, cps2names, pfarc, arcade_zangief
+import cps2crypt, cps2patch, cps2gfx, cps2preview, cps2label, cps2icons, cps2names, cps2quotes, pfarc, arcade_zangief
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 XP = os.path.join(HERE, 'arcade', 'xprime')
@@ -53,6 +53,26 @@ ZICONS = 0x9F100            # select icons: palettes and tile codes (code_select
 ZPREV = 0x9F500             # Zangief's Counter Gem block (code_select.s)
 ZSELNAME = 0x9F700          # his select screen name: pseudo entry, frame, positions (code_select.s)
 ZPORT = 0x9F800             # his select portrait: pseudo entry, palette, positions, frame (code_select.s)
+ZWIN = 0x9D000              # his WINNER screen picture, same layout (code_quotes.s)
+WIN_DX = 36                 # left of the object, where the others' pictures sit (Ryu's)
+
+def picture(base, idx, pal, x0, y0, ztiles):
+    """a still picture as a pseudo entry (long: duration/flags, long: frame),
+    its palette (16 words), the position list and a type 12 frame; its tiles go
+    to ztiles (codes TILE0-)"""
+    spr = []
+    for ty in range(0, idx.shape[0], 16):
+        for tx in range(0, idx.shape[1], 16):
+            t = np.full((16, 16), 15, np.uint8); blk = idx[ty:ty + 16, tx:tx + 16]; t[:blk.shape[0], :blk.shape[1]] = blk
+            if (t == 15).all(): continue
+            spr.append((x0 + tx, y0 + ty, arcade_zangief.TILE0 + len(ztiles))); ztiles.append(t)
+    pos = base + 8 + 32
+    frame = pos + 4 * len(spr)
+    out = struct.pack('>II', 0x0B540000, frame) + struct.pack('>16H', *pal)
+    out += b''.join(struct.pack('>hh', x, y) for x, y, c in spr)
+    out += struct.pack('>HHHI', 12, len(spr), len(spr) - 1, pos)
+    out += b''.join(struct.pack('>HH', c, 0) for x, y, c in spr)
+    return out
 ZG_PATTERN = [(3, 3, 3, 2, 2, 2), (3, 3, 3, 2, 2, 2), (4, 4, 4, 1, 1, 1), (4, 4, 4, 1, 1, 1)]
 
 def scroll1_art(r, gfx, p03, p04):
@@ -137,19 +157,13 @@ def build(spf2t, sgemf, out, verbose=True):
     selname += b''.join(struct.pack('>HH', c, 0) for x, y, c in spr)
     # his select portrait (Pocket Fighter's), 128x112 like the others, one palette
     pi, pp = cps2icons.zangief_portrait(pfgfx2, pfprog)
-    spr = []
-    for ty in range(0, cps2icons.PORT_H, 16):
-        for tx in range(0, cps2icons.PORT_W, 16):
-            t = np.full((16, 16), 15, np.uint8); blk = pi[ty:ty + 16, tx:tx + 16]; t[:blk.shape[0], :blk.shape[1]] = blk
-            if (t == 15).all(): continue
-            spr.append((tx - 64, ty - 56, arcade_zangief.TILE0 + len(ztiles))); ztiles.append(t)
-    pos = ZPORT + 8 + 32
-    frame = pos + 4 * len(spr)
-    port = struct.pack('>II', 0x0B540000, frame) + struct.pack('>16H', *pp)
-    port += b''.join(struct.pack('>hh', x, y) for x, y, c in spr)
-    port += struct.pack('>HHHI', 12, len(spr), len(spr) - 1, pos)
-    port += b''.join(struct.pack('>HH', c, 0) for x, y, c in spr)
-    p04 = cps2patch.put(p04, 0x80000, [(arcade_zangief.ZBLOB, zblob), (ZICONS, icons), (ZSELNAME, selname), (ZPORT, port)])
+    port = picture(ZPORT, pi, pp, -64, -56, ztiles)
+    # his WINNER screen picture: the same Pocket Fighter portrait, full body
+    wi, wp = cps2icons.zangief_winner(pfgfx2, pfprog)
+    win = picture(ZWIN, wi, wp, -(wi.shape[1] // 2) - WIN_DX, -(wi.shape[0] // 2), ztiles)
+    quotes, _ = cps2quotes.build(pfprog)
+    p04 = cps2patch.put(p04, 0x80000, [(arcade_zangief.ZBLOB, zblob), (ZICONS, icons), (ZSELNAME, selname), (ZPORT, port), (ZWIN, win),
+                                       (cps2quotes.ZQUOTES, quotes)])
     files = {'pzfen.03': p03, 'pzfen.04': p04}
     for g, data in zip(('13m', '15m', '17m', '19m'), arcade_zangief.gfx_roms(ztiles)):
         files['pzfen.' + g] = data
