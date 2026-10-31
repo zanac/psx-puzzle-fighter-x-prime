@@ -8,8 +8,9 @@
 |   is a long pointer instead of an offset into the table at 0x2DB1C (the hook
 |   is the frame type dispatcher, 0x14BD6). Tiles: codes 0x8000- (graphics
 |   0xC00000-, the new ROMs of the set).
-| - Palette: one 15-colour palette at ZBLOB + 0x80, written over Dan's sprite
-|   palette (P1 12, P2 16) every frame while his animation runs.
+| - Palette: one 15-colour palette at ZBLOB + 0x80, written every frame while
+|   his animation runs over the sprite palette his frames use (12, or 12 plus
+|   the object's +0x0D when +0x0C is negative: match P2, select screen).
 
 .set ZBLOB,      0x90000
 .set ZPAL,       ZBLOB + 0x80
@@ -168,14 +169,12 @@ rts
 | every frame (from the sprite list hook): his palette over Dan's while his
 | animation runs
 xp_zpal:
-movem.l %d0/%a0-%a1, -(%sp)
+movem.l %d0-%d1/%a0-%a1, -(%sp)
 lea    FIGHTER1, %a0
-lea    PAL_P1, %a1
 bsr.b  zp_one
 lea    FIGHTER2, %a0
-lea    PAL_P2, %a1
 bsr.b  zp_one
-movem.l (%sp)+, %d0/%a0-%a1
+movem.l (%sp)+, %d0-%d1/%a0-%a1
 rts
 zp_one:
 move.l 0x1C(%a0), %d0               | current animation entry
@@ -183,6 +182,15 @@ cmpi.l #ZBLOB, %d0
 bcs.b  zp_out
 cmpi.l #ZEND, %d0
 bcc.b  zp_out
+moveq  #0x0C, %d1                   | his frames' palette, as the emitter
+tst.b  0x0C(%a0)                    | offsets it (match P2, select screen)
+bpl.b  zp_slot
+add.b  0x0D(%a0), %d1
+andi.w #0x1F, %d1
+zp_slot:
+lsl.w  #5, %d1
+lea    0x90C000, %a1
+adda.w %d1, %a1
 lea    ZPAL, %a0
 moveq  #7, %d0
 zp_copy:

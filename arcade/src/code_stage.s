@@ -21,7 +21,7 @@
 .set N_STAGES,   10
 .set XP_SHOW,    0xFF3004           | byte: frames the line stays on (set by the select hook)
 .set LINE_X,     152 + 64           | sprite coordinates of the first character
-.set LINE_Y,     92 + 16
+.set LINE_Y,     207 + 16           | under the grid (the icon row took the space under the logo)
 .set FONT,       0x5880             | sprite font (8 pixels a character): tile FONT + ascii
 .set LINE_PAL,   9                  | as the game's sprite text ("1CREDIT")
 

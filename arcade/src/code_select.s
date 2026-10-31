@@ -27,6 +27,42 @@ jsr    xp_logo
 | !!! LENGTH: 0xE
 jsr    xp_logo
 
+| cursor marker position (0x261F0: d0 = character from the cursor struct at
+| a0; the game's table at 0x26208 has x, y per character 0-7, y counted up)
+| !!! INSERT AT: 261F0
+| !!! LENGTH: 0x6
+jsr    xp_curxy
+
+| the marker is drawn only for characters 0-7 (0x26170): also on the icons
+| !!! INSERT AT: 26170
+| !!! LENGTH: 0xA
+jsr    xp_curdraw
+
+| KScl's cursor movement (0x789E, d3 = directions pressed, a4 = cursor,
+| fp = select object), with the Zangief bit set as soon as the cursor moves,
+| before the poses and portraits are started
+| !!! INSERT AT: 0789E
+| !!! LENGTH: 0x56
+lea    0x03F800.l, %a0      | offsets by direction
+moveq  #0, %d4
+move.b (%a0,%d3.w), %d4
+beq.b  mv_none
+add.b  0x1(%a4), %d4
+lea    0x40(%a0), %a0       | navigation table
+move.b (%a0,%d4.w), %d0
+cmpi.b #0xFF, %d0
+beq.b  mv_none
+move.b %d4, 0x1(%a4)
+move.b %d0, (%a4)
+move.b %d0, 0x82(%fp)
+jsr    xp_selz              | Zangief bit from the new position
+jsr    0x2B572.l
+moveq  #0x17, %d0
+jsr    0x14390.l
+jsr    0x8532.l
+mv_none:
+rts
+
 | !!! INSERT AT: 0F0C00
 | !!! LENGTH: 0x200
 xp_logo:
@@ -66,6 +102,38 @@ lea    0x40(%a2), %a2               | next column
 dbf    %d1, ic_col
 addq.l #4, %a1                      | next row
 dbf    %d0, ic_row
+rts
+
+xp_curxy:
+moveq  #0, %d0
+move.b (%a0), %d0
+cmpi.b #0x01, 1(%a0)                | Zangief's icon: above Chun-Li
+bne.b  cx_dan
+move.w #0x90, 16(%fp)
+bra.b  cx_row0
+cx_dan:
+cmpi.b #0x02, 1(%a0)                | Dan's: above Sakura
+bne.b  cx_out
+move.w #0xC0, 16(%fp)
+cx_row0:
+move.w #0xB0, 20(%fp)
+moveq  #8, %d0                      | the game then skips its table
+cx_out:
+cmpi.b #8, %d0
+rts
+
+xp_curdraw:
+movea.l 50(%fp), %a0
+moveq  #0, %d0
+move.b (%a0), %d0
+cmpi.b #0x01, 1(%a0)
+beq.b  cd_icon
+cmpi.b #0x02, 1(%a0)
+bne.b  cd_out
+cd_icon:
+moveq  #0, %d0
+cd_out:
+cmpi.b #8, %d0
 rts
 
 | select hook (every frame, each player choosing): Zangief bit from the

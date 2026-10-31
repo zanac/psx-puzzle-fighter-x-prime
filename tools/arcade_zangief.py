@@ -40,7 +40,8 @@ PF = dict(idle=1, hit=111, hit2=121, ko=127, bear=150, taunt=166, punch=225,
 LIFT = {118: 8, 119: 18, 120: 26, 121: 30, 122: 26, 123: 18, 124: 8}
 
 # SPF2T arcade states (Dan's 0x7AB6C, same numbering as the PSX for 0-34) -> animation.
-# 23/24 (select screen poses) and the states the arcade does not use stay Dan's.
+# 23/24 are the select screen poses (cursor on him / chosen); the states the
+# arcade does not use stay Dan's.
 STATES = {
     0: 'idle', 1: 'pinch1', 2: 'pinch2',
     **{s: 'still' for s in range(17, 23)},
@@ -51,6 +52,7 @@ STATES = {
     15: 'taunt', 42: 'hit',
     9: 'hit', 25: 'hitloop', 26: 'hit', 27: 'hit', 28: 'hit2', 29: 'flex',
     10: 'punch', 11: 'lariat', 12: 'pile', 13: 'pile', 14: 'bear',
+    23: 'idle', 24: 'flex',
 }
 
 class PFData:
