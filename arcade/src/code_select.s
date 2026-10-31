@@ -13,6 +13,7 @@
 .set ICON_PAL0,  8
 .set CUR1,       0xFF0C82           | +1 position (P1); P2 at +4
 .set POS_ZG,     0x01               | KScl navigation positions (row 0)
+.set ZPREV,      0x9F500            | Zangief's Counter Gem block (header + 70 longs)
 
 | the three select screen set-ups (Arcade, Versus, challenge): logo + icons
 | !!! INSERT AT: 0705A
@@ -62,6 +63,12 @@ jsr    0x14390.l
 jsr    0x8532.l
 mv_none:
 rts
+
+| Counter Gem box of the character under the cursor (0x79BE: a0 = the
+| character's entry in the 0x84560 table, fp = select object)
+| !!! INSERT AT: 079BE
+| !!! LENGTH: 0x10
+jsr    xp_zprev
 
 | !!! INSERT AT: 0F0C00
 | !!! LENGTH: 0x200
@@ -134,6 +141,27 @@ cd_icon:
 moveq  #0, %d0
 cd_out:
 cmpi.b #8, %d0
+rts
+
+xp_zprev:
+moveq  #0, %d0
+move.b 0x82(%fp), %d0
+lsl.w  #4, %d0
+lea    0(%a0, %d0.w), %a0
+movea.l 4(%a0), %a0
+cmpi.b #10, 0x82(%fp)
+bne.b  zv_out
+moveq  #0, %d0
+cmpa.l #0xFF8B00, %fp
+beq.b  zv_bit
+moveq  #1, %d0
+cmpa.l #0xFF8C00, %fp
+bne.b  zv_out
+zv_bit:
+btst   %d0, XP_ZBITS
+beq.b  zv_out
+lea    ZPREV, %a0
+zv_out:
 rts
 
 | select hook (every frame, each player choosing): Zangief bit from the

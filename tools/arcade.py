@@ -49,6 +49,8 @@ def swap(b): return bytes(x for i in range(0, len(b), 2) for x in (b[i + 1], b[i
 
 ZNAME = 0x9F000             # ZANGIEF's two HUD name lists (code_zangief.s)
 ZICONS = 0x9F100            # select icons: palettes and tile codes (code_select.s)
+ZPREV = 0x9F500             # Zangief's Counter Gem block (code_select.s)
+ZG_PATTERN = [(3, 3, 3, 2, 2, 2), (3, 3, 3, 2, 2, 2), (4, 4, 4, 1, 1, 1), (4, 4, 4, 1, 1, 1)]
 
 def scroll1_art(r, gfx, p03, p04):
     """new scroll1 pictures (gfx list changed in place): Dan's Counter Gem preview
@@ -64,10 +66,16 @@ def scroll1_art(r, gfx, p03, p04):
     dan = 10
     im = cps2preview.draw(G, prog, dan, cps2preview.pattern(prog, dan), model)
     lst = cps2preview.install(alloc, prog, dan, im)
+    # Zangief's preview (Siberian Bear), in a copy of Dan's whole block
+    zim = cps2preview.draw(G, prog, dan, ZG_PATTERN, model)
+    zl = cps2preview.install(alloc, prog, dan, zim)
+    blk = cps2preview.PREVIEW + 0x11E * dan     # the 25 preview longs are the last
+    lst0 = blk - 6 - 45 * 4                      # 25 of the box list (6 + 70 longs)
+    zblock = prog[lst0:blk] + zl
     names, _ = cps2label.Labels(G, prog).build(alloc)
     gfx[:] = G.roms()
     return cps2patch.put(p04, 0x80000, [(cps2preview.PREVIEW + 0x11E * dan, lst),
-                                        (ZNAME, names[0]), (ZNAME + 0x80, names[1])])
+                                        (ZNAME, names[0]), (ZNAME + 0x80, names[1]), (ZPREV, zblock)])
 
 def srcs(d, kind):
     return sorted(os.path.join(d, f) for f in os.listdir(d) if f.endswith('.s') and f.startswith(kind)) if os.path.isdir(d) else []
