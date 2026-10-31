@@ -94,6 +94,7 @@ rts
 | sprite list: a2 = next entry, d7 = entries left; then what the hook
 | replaced: the count of used entries, the end mark
 xp_sprites:
+jsr    xp_zpal                      | code_zangief.s
 tst.b  XP_SHOW
 beq.b  sp_end
 subq.b #1, XP_SHOW

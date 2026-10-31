@@ -8,7 +8,7 @@ Only the program and graphics of the hack come out of this script: every
 byte of game data is taken from your sets."""
 import sys, os, zipfile, zlib, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import cps2crypt, cps2patch, cps2gfx, cps2preview
+import cps2crypt, cps2patch, cps2gfx, cps2preview, arcade_zangief
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 XP = os.path.join(HERE, 'arcade', 'xprime')
@@ -18,7 +18,11 @@ SPF2T = {   # name: crc32 (MAME spf2t)
     'pzfe.03': 0x2af51954, 'pzf.04': 0xb80649e2, 'pzf.14m': 0x2d4881cb, 'pzf.16m': 0x4b0fd1be,
     'pzf.18m': 0xe43aac33, 'pzf.20m': 0x7f536ff1, 'pzf.01': 0x600fb2a3, 'pzf.02': 0x496076e0,
     'pzf.11m': 0x78442743, 'pzf.12m': 0x399d2c7b, 'spf2t.key': 0x4c4dc7e3}
-SGEMF = {}  # filled in when Zangief's data is taken from it
+SGEMF = {   # name: crc32 (MAME sgemf); only data is read, nothing is decrypted
+    'pcfu.03': 0xac2e8566, 'pcf.04': 0xf4314c96, 'pcf.05': 0x215655f6, 'pcf.06': 0xea6f13ea,
+    'pcf.07': 0x5ac6d5ea, 'pcf.13m': 0x22d72ab9, 'pcf.15m': 0x16a4813c, 'pcf.17m': 0x1097e035,
+    'pcf.19m': 0xd362d874, 'pcf.14m': 0x0383897c, 'pcf.16m': 0x76f91084, 'pcf.18m': 0x756c3754,
+    'pcf.20m': 0x9ec9277d}
 
 def read_set(path, want):
     """{name: bytes} found by CRC (any folder, any name) or by name"""
@@ -85,7 +89,17 @@ def build(spf2t, sgemf, out, verbose=True):
     gfx = [ips(r['pzf.' + g], open(os.path.join(XP, 'gfx', 'pzf-%s.ips' % g), 'rb').read())
            for g in ('14m', '16m', '18m', '20m')]
     p04 = previews(r, gfx, p03, p04)
+    # Zangief: his animations (blob in pzf.04) and graphics (new ROMs, 0xC00000-)
+    s = read_set(sgemf, SGEMF)
+    pfprog = swap(b''.join(s[n] for n in ('pcfu.03', 'pcf.04', 'pcf.05', 'pcf.06', 'pcf.07')))
+    pfgfx = cps2gfx.Gfx(groups=[(0, [s['pcf.13m'], s['pcf.15m'], s['pcf.17m'], s['pcf.19m']]),
+                               (0x1000000, [s['pcf.14m'], s['pcf.16m'], s['pcf.18m'], s['pcf.20m']])])
+    zblob, ztiles = arcade_zangief.build(pfprog, pfgfx, verbose)
+    del pfgfx
+    p04 = cps2patch.put(p04, 0x80000, [(arcade_zangief.ZBLOB, zblob)])
     files = {'pzfen.03': p03, 'pzfen.04': p04}
+    for g, data in zip(('13m', '15m', '17m', '19m'), arcade_zangief.gfx_roms(ztiles)):
+        files['pzfen.' + g] = data
     for g, data in zip(('14m', '16m', '18m', '20m'), gfx):
         files['pzfen.' + g] = data
     for n in ('pzf.01', 'pzf.02', 'pzf.11m', 'pzf.12m', 'spf2t.key'):

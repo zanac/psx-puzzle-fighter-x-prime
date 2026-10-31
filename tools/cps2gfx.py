@@ -64,10 +64,16 @@ def from_pixels(px):
     return d.view(np.uint8)
 
 class Gfx:
-    """pixels of the whole graphics region: tile t (16x16) = px[t*256:(t+1)*256]"""
-    def __init__(self, roms, base=0):
-        reg = interleave(roms)
-        if base: reg = np.concatenate([np.zeros(base, np.uint8), reg])
+    """pixels of the whole graphics region: tile t (16x16) = px[t*256:(t+1)*256].
+    roms: four ROMs loaded at 0, or groups=[(region offset, [four ROMs]), ...]"""
+    def __init__(self, roms=None, base=0, groups=None):
+        if groups is None:
+            reg = interleave(roms)
+            if base: reg = np.concatenate([np.zeros(base, np.uint8), reg])
+        else:
+            size = max(o + 4 * len(r[0]) for o, r in groups)
+            reg = np.zeros(size, np.uint8)
+            for o, r in groups: reg[o:o + 4 * len(r[0])] = interleave(r)
         self.base = base
         self.px = to_pixels(unshuffle(reg))
     def tile(self, t):
