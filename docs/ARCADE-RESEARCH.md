@@ -225,6 +225,19 @@ wagon; lists, block libraries and palettes in `tools/cps2castle.py`.
 
 ## Test harness notes
 
+- `arcade/test/stress.py`: random play with checks at every match start (stage
+  selector, castle, palettes, music, the CPU's stage, rounds) and a watchdog;
+  see its header. Settings live in RAM from the EEPROM: 0xFF80A2 / 0xFF80A3 =
+  1P / 2P MAX ROUND (1, 2, 3 = 1, 3, 5 rounds), copied to 0xFF8121 per match;
+  rounds won at player + 0xA3, consecutive wins (BCD) at + 0xA2. Boards: P1
+  0xFFAB10, P2 0xFFAD10 (13 rows of 16 bytes, 6 cells; drop column at +8).
+- Found by it: the next-opponent path (0xBB16 -> 0xBAB2) passes the player
+  structs sign-extended from words (a0 = 0xFFFF8300): code comparing struct
+  addresses must look at 24 bits only (xp_zis_ok, xp_zcpu). Before the fix
+  Zangief's Arcade looped at the place Felicia was moved from.
+- Random play can keep a round alive for ever (both drop columns kept clear by
+  crash gems); this is the game's behaviour, not a hang.
+
 - `tools/cps2emu.py`: breakpoints and watchpoints log registers only; the log's
   pc for a write is the writer (sprite list owners: a6 = the object).
 - Making the CPU lose: fill its board's drop column (P2 board 0xFFAD10, 13 rows of

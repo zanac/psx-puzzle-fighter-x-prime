@@ -64,12 +64,12 @@ movem.l %d0/%a0, -(%sp)
 moveq  #0, %d0
 cmpi.w #DAN_STAGE, A5 + 0x100
 bne.b  ic_out
-moveq  #1, %d0
-tst.b  XP_CASTLE
-bne.b  ic_out
-moveq  #0, %d0
 cmpi.b #3, A5 + 0xAC                | two players: XP_CASTLE decides
-beq.b  ic_out
+bne.b  ic_1p
+tst.b  XP_CASTLE                    | (in a one-player game it may be stale:
+sne    %d0                          | the attract demo goes through xp_stage)
+bra.b  ic_out
+ic_1p:
 lea    PLAYER1, %a0                 | the CPU (+0x9E set)
 tst.b  0x9E(%a0)
 bne.b  ic_cpu

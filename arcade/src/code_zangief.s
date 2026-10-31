@@ -131,24 +131,28 @@ zx_out:
 movea.l (%sp)+, %a0
 rts
 
-| Z set when the player struct at a0 is NOT Zangief
+| Z set when the player struct at a0 is NOT Zangief. a0 may come
+| sign-extended from a word (0xFFFF8300: the game keeps the two structs as
+| words at 0xFF813A/C): only its 24 address bits count.
 xp_zis_ok:
-movem.l %d0, -(%sp)
+movem.l %d0-%d1, -(%sp)
 cmpi.b #10, 0x82(%a0)
 bne.b  zo_no
+move.l %a0, %d1
+andi.l #0xFFFFFF, %d1
 moveq  #1, %d0
-cmpa.l #PLAYER1, %a0
+cmpi.l #PLAYER1, %d1
 beq.b  zo_bit
 moveq  #2, %d0
-cmpa.l #PLAYER2, %a0
+cmpi.l #PLAYER2, %d1
 bne.b  zo_no
 zo_bit:
 and.b  XP_ZBITS, %d0
-movem.l (%sp)+, %d0
+movem.l (%sp)+, %d0-%d1
 rts
 zo_no:
 moveq  #0, %d0
-movem.l (%sp)+, %d0
+movem.l (%sp)+, %d0-%d1
 rts
 
 xp_zname:

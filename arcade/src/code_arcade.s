@@ -221,11 +221,11 @@ move.w %d0, A5 + 0x112              | the two instructions replaced
 move.b %d1, 0x82(%a1)
 movem.l %d0-%d2/%a0-%a1, -(%sp)
 zc_go:
-moveq  #0, %d2                      | the CPU's bit
-cmpa.l #PLAYER1, %a1
-beq.b  zc_side
-moveq  #1, %d2
-zc_side:
+move.l %a1, %d2                     | the CPU's bit (a1 may be sign-extended)
+andi.l #0xFFFFFF, %d2
+cmpi.l #PLAYER1, %d2
+seq    %d2                          | P1: 0xFF + 1 = 0, P2: 1
+addq.b #1, %d2
 bclr   %d2, XP_ZBITS
 cmpi.b #10, %d1                     | Dan's place
 bne.b  zc_out
