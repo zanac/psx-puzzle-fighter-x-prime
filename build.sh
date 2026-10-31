@@ -18,7 +18,7 @@
 # Arcade: --arcade also builds the CPS2 set spf2enh.zip, next to <output>,
 #         from your MAME sets spf2t and sgemf (see build_arcade.sh).
 #         With --arcade, his stage also gets a remix of its music for the
-#         arranged music setting, rendered from sgemf (needs scipy).
+#         arranged music setting, rendered from sgemf.
 set -e
 
 ARC_SPF=""
@@ -73,13 +73,13 @@ python3 "$HERE/tools/extract.py" "$IN" /DATA/STAGE03.EMI "$TMP/STAGE03.EMI"
 python3 "$HERE/tools/pf_stage.py" "$TMP/ST06.PAC" "$TMP/STAGE03.EMI" "$TMP/ZG_STAGE.EMI"
 # with the arranged music on, his stage plays a remix of the castle theme,
 # rendered from Pocket Fighter's arcade set (--arcade's sgemf: the PSX disc
-# has no notes); without it (or without scipy) the original plays both ways
+# has no notes); without it the original plays both ways
 REMIX=""
 if [ -n "$ARC_PF" ]; then
 	if python3 "$HERE/tools/remix.py" "$ARC_PF" "$TMP/REMIX.wav"; then
 		REMIX="$TMP/REMIX.wav"
 	else
-		echo "remix not rendered (needs numpy and scipy): the original music for both settings"
+		echo "remix not rendered: the original music for both settings"
 	fi
 fi
 python3 "$HERE/tools/pf_stage.py" music "$PF" "$TMP/ZG_MUSIC.XA" $REMIX
