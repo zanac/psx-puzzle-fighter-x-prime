@@ -77,19 +77,29 @@ def draw(G, prog, ch, newpat, model):
         im[y, x] = votes.most_common(1)[0][0]
     return im
 
-def install(G, prog, ch, im, free):
-    """reuse identical tiles where they exist, else take codes from `free`;
-    returns the new 25 entries (bytes, big endian)"""
-    T = G.px.reshape(-1, 16, 16)
-    t8 = np.stack([T[:, 0:8, 8:16], T[:, 8:16, 8:16]], 1).reshape(-1, 8, 8)
-    have = {}
-    for c in range(len(t8) - 1, -1, -1):
-        if c not in free: have[t8[c].tobytes()] = c
-    free = list(free); out = []
-    for i, e in enumerate(entries(prog, ch)):
-        blk = np.ascontiguousarray(im[(i // 5) * 8:(i // 5) * 8 + 8, (i % 5) * 8:(i % 5) * 8 + 8])
-        c = have.get(blk.tobytes())
+class Scroll1Alloc:
+    """8x8 scroll1 tiles for new pictures: reuse identical tiles where they exist,
+    else take codes from `free` (tiles nothing shows any more)"""
+    def __init__(self, G, free):
+        self.G, self.free = G, list(free)
+        T = G.px.reshape(-1, 16, 16)
+        t8 = np.stack([T[:, 0:8, 8:16], T[:, 8:16, 8:16]], 1).reshape(-1, 8, 8)
+        self.have = {}
+        fs = set(self.free)
+        for c in range(len(t8) - 1, -1, -1):
+            if c not in fs: self.have[t8[c].tobytes()] = c
+    def code(self, blk):
+        blk = np.ascontiguousarray(blk, np.uint8)
+        c = self.have.get(blk.tobytes())
         if c is None:
-            c = free.pop(0); set_code8(G, c, blk); have[blk.tobytes()] = c
+            if not self.free: raise SystemExit('no free scroll1 tiles left')
+            c = self.free.pop(0); set_code8(self.G, c, blk); self.have[blk.tobytes()] = c
+        return c
+
+def install(alloc, prog, ch, im):
+    """Dan's preview list with the tiles of `im`; returns the 25 entries (bytes, big endian)"""
+    out = []
+    for i, e in enumerate(entries(prog, ch)):
+        c = alloc.code(im[(i // 5) * 8:(i // 5) * 8 + 8, (i % 5) * 8:(i % 5) * 8 + 8])
         out.append((c << 16) | (e & 0xffff))
     return struct.pack('>25I', *out)

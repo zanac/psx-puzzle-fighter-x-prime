@@ -8,7 +8,7 @@ Only the program and graphics of the hack come out of this script: every
 byte of game data is taken from your sets."""
 import sys, os, zipfile, zlib, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import cps2crypt, cps2patch, cps2gfx, cps2preview, arcade_zangief
+import cps2crypt, cps2patch, cps2gfx, cps2preview, cps2label, arcade_zangief
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 XP = os.path.join(HERE, 'arcade', 'xprime')
@@ -47,21 +47,26 @@ def ips(data, p):
 
 def swap(b): return bytes(x for i in range(0, len(b), 2) for x in (b[i + 1], b[i]))
 
-def previews(r, gfx, p03, p04):
-    """redraw Dan's Counter Gem preview for his new pattern (gfx list changed in place);
-    returns pzf.04 with his new tile list"""
+ZNAME = 0x9F000             # ZANGIEF's two HUD name lists (code_zangief.s)
+
+def scroll1_art(r, gfx, p03, p04):
+    """new scroll1 pictures (gfx list changed in place): Dan's Counter Gem preview
+    for his new pattern, ZANGIEF's HUD name; returns pzf.04 with their lists"""
     G = cps2gfx.Gfx(gfx)
     prog = swap(p03) + swap(p04)
     van = swap(r['pzfe.03']) + swap(r['pzf.04'])
     used = lambda img, chars: set(e >> 16 for c in chars for e in cps2preview.entries(img, c))
     # tiles of the previews X' redrew (Morrigan, Ryu, Hsien-Ko, Felicia, Sakura) are free now
     free = sorted(used(van, (0, 2, 4, 6, 7)) - used(prog, range(11)))
+    alloc = cps2preview.Scroll1Alloc(G, free)
     model = cps2preview.learn(G, prog, [c for c in range(10) if c != 8])
     dan = 10
     im = cps2preview.draw(G, prog, dan, cps2preview.pattern(prog, dan), model)
-    lst = cps2preview.install(G, prog, dan, im, free)
+    lst = cps2preview.install(alloc, prog, dan, im)
+    names, _ = cps2label.Labels(G, prog).build(alloc)
     gfx[:] = G.roms()
-    return cps2patch.put(p04, 0x80000, [(cps2preview.PREVIEW + 0x11E * dan, lst)])
+    return cps2patch.put(p04, 0x80000, [(cps2preview.PREVIEW + 0x11E * dan, lst),
+                                        (ZNAME, names[0]), (ZNAME + 0x80, names[1])])
 
 def srcs(d, kind):
     return sorted(os.path.join(d, f) for f in os.listdir(d) if f.endswith('.s') and f.startswith(kind)) if os.path.isdir(d) else []
@@ -88,7 +93,7 @@ def build(spf2t, sgemf, out, verbose=True):
     p04 = cps2patch.put(p04, 0x80000, [p for p in patches['data'] if p[0] >= 0x80000])
     gfx = [ips(r['pzf.' + g], open(os.path.join(XP, 'gfx', 'pzf-%s.ips' % g), 'rb').read())
            for g in ('14m', '16m', '18m', '20m')]
-    p04 = previews(r, gfx, p03, p04)
+    p04 = scroll1_art(r, gfx, p03, p04)
     # Zangief: his animations (blob in pzf.04) and graphics (new ROMs, 0xC00000-)
     s = read_set(sgemf, SGEMF)
     pfprog = swap(b''.join(s[n] for n in ('pcfu.03', 'pcf.04', 'pcf.05', 'pcf.06', 'pcf.07')))

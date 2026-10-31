@@ -12,7 +12,7 @@ bank, i.e. graphics region 0xC00000-)."""
 import struct
 import numpy as np
 
-SCALE = 0.65
+SCALE = 0.9
 ZBLOB = 0x90000             # must match arcade/src/code_zangief.s
 N_STATES = 63               # Dan's state table (0x7AB6C): 63 words
 PALOFF = 0x80               # palette (16 words) in the blob
