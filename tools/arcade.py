@@ -8,7 +8,7 @@ Only the program and graphics of the hack come out of this script: every
 byte of game data is taken from your sets."""
 import sys, os, zipfile, zlib, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import cps2crypt, cps2patch
+import cps2crypt, cps2patch, cps2gfx, cps2preview
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 XP = os.path.join(HERE, 'arcade', 'xprime')
@@ -41,6 +41,24 @@ def ips(data, p):
             data[off:off + n] = p[i:i + n]; i += n
     return bytes(data)
 
+def swap(b): return bytes(x for i in range(0, len(b), 2) for x in (b[i + 1], b[i]))
+
+def previews(r, gfx, p03, p04):
+    """redraw Dan's Counter Gem preview for his new pattern (gfx list changed in place);
+    returns pzf.04 with his new tile list"""
+    G = cps2gfx.Gfx(gfx)
+    prog = swap(p03) + swap(p04)
+    van = swap(r['pzfe.03']) + swap(r['pzf.04'])
+    used = lambda img, chars: set(e >> 16 for c in chars for e in cps2preview.entries(img, c))
+    # tiles of the previews X' redrew (Morrigan, Ryu, Hsien-Ko, Felicia, Sakura) are free now
+    free = sorted(used(van, (0, 2, 4, 6, 7)) - used(prog, range(11)))
+    model = cps2preview.learn(G, prog, [c for c in range(10) if c != 8])
+    dan = 10
+    im = cps2preview.draw(G, prog, dan, cps2preview.pattern(prog, dan), model)
+    lst = cps2preview.install(G, prog, dan, im, free)
+    gfx[:] = G.roms()
+    return cps2patch.put(p04, 0x80000, [(cps2preview.PREVIEW + 0x11E * dan, lst)])
+
 def srcs(d, kind):
     return sorted(os.path.join(d, f) for f in os.listdir(d) if f.endswith('.s') and f.startswith(kind)) if os.path.isdir(d) else []
 
@@ -63,9 +81,12 @@ def build(spf2t, sgemf, out, verbose=True):
     p03 = cps2patch.put(p03, 0, [p for p in patches['data'] if p[0] < 0x80000])
     p04 = cps2patch.put(r['pzf.04'], 0, patches['xp04'])
     p04 = cps2patch.put(p04, 0x80000, [p for p in patches['data'] if p[0] >= 0x80000])
+    gfx = [ips(r['pzf.' + g], open(os.path.join(XP, 'gfx', 'pzf-%s.ips' % g), 'rb').read())
+           for g in ('14m', '16m', '18m', '20m')]
+    p04 = previews(r, gfx, p03, p04)
     files = {'pzfen.03': p03, 'pzfen.04': p04}
-    for g in ('14m', '16m', '18m', '20m'):
-        files['pzfen.' + g] = ips(r['pzf.' + g], open(os.path.join(XP, 'gfx', 'pzf-%s.ips' % g), 'rb').read())
+    for g, data in zip(('14m', '16m', '18m', '20m'), gfx):
+        files['pzfen.' + g] = data
     for n in ('pzf.01', 'pzf.02', 'pzf.11m', 'pzf.12m', 'spf2t.key'):
         files[n] = r[n]
     zf = zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED)
