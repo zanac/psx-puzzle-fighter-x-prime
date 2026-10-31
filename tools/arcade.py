@@ -7,8 +7,9 @@ sgemf.zip: Super Gem Fighter Mini Mix / Pocket Fighter - Zangief's graphics and 
 Only the program and graphics of the hack come out of this script: every
 byte of game data is taken from your sets."""
 import sys, os, zipfile, zlib, tempfile, struct
+import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import cps2crypt, cps2patch, cps2gfx, cps2preview, cps2label, cps2icons, arcade_zangief
+import cps2crypt, cps2patch, cps2gfx, cps2preview, cps2label, cps2icons, cps2names, pfarc, arcade_zangief
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 XP = os.path.join(HERE, 'arcade', 'xprime')
@@ -50,6 +51,7 @@ def swap(b): return bytes(x for i in range(0, len(b), 2) for x in (b[i + 1], b[i
 ZNAME = 0x9F000             # ZANGIEF's two HUD name lists (code_zangief.s)
 ZICONS = 0x9F100            # select icons: palettes and tile codes (code_select.s)
 ZPREV = 0x9F500             # Zangief's Counter Gem block (code_select.s)
+ZSELNAME = 0x9F700          # his select screen name: pseudo entry, frame, positions (code_select.s)
 ZG_PATTERN = [(3, 3, 3, 2, 2, 2), (3, 3, 3, 2, 2, 2), (4, 4, 4, 1, 1, 1), (4, 4, 4, 1, 1, 1)]
 
 def scroll1_art(r, gfx, p03, p04):
@@ -118,7 +120,21 @@ def build(spf2t, sgemf, out, verbose=True):
         for t in cps2icons.tiles_of(idx):
             codes.append(arcade_zangief.TILE0 + len(ztiles)); ztiles.append(t)
     icons = struct.pack('>16H', *zp) + struct.pack('>16H', *dp) + struct.pack('>18H', *codes)
-    p04 = cps2patch.put(p04, 0x80000, [(arcade_zangief.ZBLOB, zblob), (ZICONS, icons)])
+    # ZANGIEF in the select screen's name font: a type 12 frame
+    spf = pfarc.PF(swap(p03) + swap(p04), cps2gfx.Gfx(gfx), postable=0x2DB1C)
+    nm = cps2names.compose(spf)
+    w = nm.shape[1]; x0 = -(w // 2)
+    spr = []
+    for tx in range(0, w, 16):
+        t = np.full((16, 16), 15, np.uint8); blk = nm[:, tx:tx + 16]; t[:, :blk.shape[1]] = blk
+        spr.append((x0 + tx, -8, arcade_zangief.TILE0 + len(ztiles))); ztiles.append(t)
+    pos = ZSELNAME + 8
+    frame = pos + 4 * len(spr)
+    selname = struct.pack('>II', 0x0B540000, frame)
+    selname += b''.join(struct.pack('>hh', x, y) for x, y, c in spr)
+    selname += struct.pack('>HHHI', 12, len(spr), len(spr) - 1, pos)
+    selname += b''.join(struct.pack('>HH', c, 0) for x, y, c in spr)
+    p04 = cps2patch.put(p04, 0x80000, [(arcade_zangief.ZBLOB, zblob), (ZICONS, icons), (ZSELNAME, selname)])
     files = {'pzfen.03': p03, 'pzfen.04': p04}
     for g, data in zip(('13m', '15m', '17m', '19m'), arcade_zangief.gfx_roms(ztiles)):
         files['pzfen.' + g] = data

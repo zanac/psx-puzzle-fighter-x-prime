@@ -13,6 +13,7 @@
 .set ICON_PAL0,  8
 .set CUR1,       0xFF0C82           | +1 position (P1); P2 at +4
 .set POS_ZG,     0x01               | KScl navigation positions (row 0)
+.set ZSELNAME,   0x9F700            | his name: pseudo entry (dur/flags, frame)
 .set ZPREV,      0x9F500            | Zangief's Counter Gem block (header + 70 longs)
 
 | the three select screen set-ups (Arcade, Versus, challenge): logo + icons
@@ -69,6 +70,12 @@ rts
 | !!! INSERT AT: 079BE
 | !!! LENGTH: 0x10
 jsr    xp_zprev
+
+| name under the select pose (0x262A0: a0 = 0x7DB20 table, d0 = character
+| or 11 + character, a4 = select object): his own name
+| !!! INSERT AT: 262A0
+| !!! LENGTH: 0xE
+jsr    xp_zselname
 
 | !!! INSERT AT: 0F0C00
 | !!! LENGTH: 0x200
@@ -162,6 +169,34 @@ btst   %d0, XP_ZBITS
 beq.b  zv_out
 lea    ZPREV, %a0
 zv_out:
+rts
+
+xp_zselname:
+lsl.w  #2, %d0
+lea    0(%a0, %d0.w), %a0
+cmpi.b #10, 0x82(%a4)
+bne.b  sn_set
+move.l %a4, %d0                     | a4 comes sign-extended (moveaw): 24 bits
+andi.l #0xFFFFFF, %d0
+cmpi.l #0xFF8B00, %d0
+seq    %d0
+andi.b #1, %d0
+beq.b  sn_p2
+moveq  #0, %d0
+bra.b  sn_bit
+sn_p2:
+move.l %a4, %d0
+andi.l #0xFFFFFF, %d0
+cmpi.l #0xFF8C00, %d0
+bne.b  sn_set
+moveq  #1, %d0
+sn_bit:
+btst   %d0, XP_ZBITS
+beq.b  sn_set
+lea    ZSELNAME, %a0
+sn_set:
+move.l %a0, 28(%fp)
+move.l (%a0), 24(%fp)
 rts
 
 | select hook (every frame, each player choosing): Zangief bit from the

@@ -35,6 +35,11 @@ class PF:
         Word 0 is the frame type (the emitter's jump table); type 2: word sprites,
         word count-1, long position list, count longs code << 16 | attr."""
         t = self.W(f)
+        if t == 0:      # word count, word attr, position list, count words code
+            n, attr = self.W(f + 2), self.W(f + 4)
+            if self.postable is None: pos, first = self.L(f + 6), f + 10
+            else: pos, first = self.L(self.postable + self.W(f + 6)), f + 8
+            return [(self.S(pos + 4 * i), self.S(pos + 4 * i + 2), self.W(first + 2 * i), attr) for i in range(n)]
         if t != 2: raise ValueError('frame %x: type %d' % (f, t))
         n = self.W(f + 4) + 1
         if self.postable is None:
