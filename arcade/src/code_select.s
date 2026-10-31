@@ -73,8 +73,9 @@ rts
 | !!! LENGTH: 0x10
 jsr    xp_zprev
 
-| name under the select pose (0x262A0: a0 = 0x7DB20 table, d0 = character
-| or 11 + character, a4 = select object): his own name
+| name under the select pose and on the VS screen (0x262A0: a0 = 0x7DB20 or
+| 0x7DB78 table, d0 = character or 11 + character, a4 = select object or
+| player struct): his own name
 | !!! INSERT AT: 262A0
 | !!! LENGTH: 0xE
 jsr    xp_zselname
@@ -93,6 +94,13 @@ jsr    xp_samech
 | !!! INSERT AT: 07FC6
 | !!! LENGTH: 0x8
 jsr    xp_samech
+
+| VS screen portrait (0x23BF0: d0 = character, a4 = player struct, a1 = past
+| the 10 palettes just loaded for it; then 0x23C94 sets the entry from the
+| table 0x7DAC6, character + 11): his portrait, the same frame as the select one
+| !!! INSERT AT: 23BF0
+| !!! LENGTH: 0x8
+jsr    xp_zvsport
 
 | !!! INSERT AT: 0F0C00
 | !!! LENGTH: 0x400
@@ -193,20 +201,21 @@ lsl.w  #2, %d0
 lea    0(%a0, %d0.w), %a0
 cmpi.b #10, 0x82(%a4)
 bne.b  sn_set
-move.l %a4, %d0                     | a4 comes sign-extended (moveaw): 24 bits
-andi.l #0xFFFFFF, %d0
-cmpi.l #0xFF8B00, %d0
-seq    %d0
-andi.b #1, %d0
-beq.b  sn_p2
-moveq  #0, %d0
-bra.b  sn_bit
-sn_p2:
-move.l %a4, %d0
-andi.l #0xFFFFFF, %d0
+move.l %a4, %d0                     | a4 comes sign-extended (moveaw): 24 bits;
+andi.l #0xFFFFFF, %d0               | select object (select screen) or player
+cmpi.l #0xFF8B00, %d0               | struct (VS screen)
+beq.b  sn_p1
+cmpi.l #0xFF8300, %d0
+beq.b  sn_p1
 cmpi.l #0xFF8C00, %d0
+beq.b  sn_p2
+cmpi.l #0xFF8700, %d0
 bne.b  sn_set
+sn_p2:
 moveq  #1, %d0
+bra.b  sn_bit
+sn_p1:
+moveq  #0, %d0
 sn_bit:
 btst   %d0, XP_ZBITS
 beq.b  sn_set
@@ -233,6 +242,26 @@ add.w  %d0, %d0
 add.w  %d0, %d0
 lea    XP_PORTOBJ, %a0
 move.l %fp, 0(%a0, %d0.w)
+rts
+
+xp_zvsport:
+move.l %a0, -(%sp)
+move.l %a4, %d1                     | a4 sign-extended: 24 bits
+andi.l #0xFFFFFF, %d1
+movea.l %d1, %a0
+jsr    xp_zis_ok                    | code_zangief.s (Z: not Zangief)
+movea.l (%sp)+, %a0
+bne.b  zv_his
+addi.b #11, %d0
+jmp    0x23C94
+zv_his:
+lea    -0x140(%a1), %a1             | the first of the 10 palette slots
+lea    ZPORT + 8, %a0
+moveq  #7, %d1
+zv_copy:
+move.l (%a0)+, (%a1)+
+dbf    %d1, zv_copy
+move.l #ZPORT, 28(%fp)
 rts
 
 | every frame: his portrait's palette over the slot it uses

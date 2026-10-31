@@ -249,6 +249,8 @@ bsr.b  zp_one
 movem.l (%sp)+, %d0-%d1/%a0-%a1
 rts
 zp_one:
+tst.b  1(%a0)                       | not drawn (VS screen: the object keeps
+beq.b  zp_out                       | the select pose, the slot is someone else's)
 move.l 0x1C(%a0), %d0               | current animation entry
 cmpi.l #ZBLOB, %d0
 bcs.b  zp_out
