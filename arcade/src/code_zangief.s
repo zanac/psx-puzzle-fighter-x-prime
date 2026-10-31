@@ -19,6 +19,9 @@
 .set FIGHTER2,   0xFF8C00
 .set PAL_P1,     0x90C000 + 12 * 32
 .set PAL_P2,     0x90C000 + 16 * 32
+.set ZNAME,      0x9F000            | HUD name lists (side 0, side 0x80 later), tools/cps2label.py
+.set PLAYER1,    0xFF8300
+.set PLAYER2,    0xFF8700
 
 | !!! INSERT AT: 14396
 | !!! LENGTH: 0x8
@@ -31,6 +34,11 @@ jsr    xp_zanim
 | !!! INSERT AT: 14BD6
 | !!! LENGTH: 0xA
 jmp    xp_ftype
+
+| match HUD name (0x16C78: a0 = list of the character's name, fp = player)
+| !!! INSERT AT: 16C78
+| !!! LENGTH: 0x8
+jsr    xp_zname
 
 | !!! INSERT AT: 0F0800
 | !!! LENGTH: 0x400
@@ -69,6 +77,30 @@ moveq  #0, %d0
 zm_bit:
 and.b  XP_ZBITS, %d0
 movem.l (%sp)+, %d0                 | (movem does not touch the flags)
+rts
+
+xp_zname:
+lea    0(%a2, %d0.w), %a0
+movea.l 4(%a0), %a0
+cmpi.b #10, 0x82(%fp)
+bne.b  zn_out
+move.l %d0, -(%sp)
+moveq  #1, %d0
+cmpa.l #PLAYER1, %fp
+beq.b  zn_bit
+moveq  #2, %d0
+cmpa.l #PLAYER2, %fp
+bne.b  zn_no
+zn_bit:
+and.b  XP_ZBITS, %d0
+beq.b  zn_no
+lea    ZNAME, %a0
+tst.b  0x81(%fp)                    | side
+beq.b  zn_no
+lea    ZNAME + 0x80, %a0
+zn_no:
+move.l (%sp)+, %d0
+zn_out:
 rts
 
 | frame type dispatcher: d0 = type (word at a0, a0 moves past it)
