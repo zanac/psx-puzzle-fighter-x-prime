@@ -1,8 +1,8 @@
 """CD-XA ADPCM (Level B: 37.8 kHz, 4 bits, stereo), encoder and decoder.
 
 A sector's audio is 18 sound groups of 128 bytes (+ 20 unused bytes):
-  bytes 0-15   the 8 sound units' parameters (filter << 4 | range), stored as
-               units 0-3, 4-7, 0-3, 4-7
+  bytes 0-15   the 8 sound units' parameters (filter << 4 | range): units
+               0-3 at 4-7 and 4-7 at 8-11; 0-3 and 12-15 are copies of them
   bytes 16-127 28 words of 4 bytes: byte j of word i holds sample i of unit
                2j (low nibble) and of unit 2j + 1 (high nibble)
 Stereo: even units are left, odd units right; a group is 4 x 28 = 112
@@ -57,8 +57,8 @@ def encode(pcm):
                 prev[ch] = [q1, q2]
                 params[u] = f << 4 | r; nibs[u] = nb
             grp = bytearray(128)
-            grp[0:4] = bytes(params[0:4]); grp[4:8] = bytes(params[4:8])
-            grp[8:12] = bytes(params[0:4]); grp[12:16] = bytes(params[4:8])
+            grp[0:4] = bytes(params[0:4]); grp[4:8] = bytes(params[0:4])
+            grp[8:12] = bytes(params[4:8]); grp[12:16] = bytes(params[4:8])
             for i in range(28):
                 for j in range(4):
                     grp[16 + 4 * i + j] = int(nibs[2 * j][i]) | int(nibs[2 * j + 1][i]) << 4
@@ -73,7 +73,7 @@ def decode(sectors):
     for sec in sectors:
         for g in range(GROUPS):
             grp = sec[128 * g:128 * g + 128]
-            params = list(grp[0:4]) + list(grp[4:8])
+            params = list(grp[4:12])
             buf = np.zeros((112, 2), np.int64)
             for u in range(8):
                 f, r = params[u] >> 4, params[u] & 15

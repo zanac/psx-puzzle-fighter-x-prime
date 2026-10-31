@@ -20,7 +20,8 @@ original, so that it loops the same way):
   breakdown 12 (bars 8-11 x 3, half time) | solo 20 | theme 20 |
   theme a tone higher 20 | outro 4
 
-usage: remix.py sgemf.zip OUT.wav     (37.8 kHz stereo, for tools/xa.py)
+usage: remix.py sgemf.zip OUT.wav [--style dance|metal]   (37.8 kHz stereo,
+       for tools/xa.py)
 Needs numpy and scipy."""
 import os, struct, sys, zipfile
 import numpy as np
@@ -158,7 +159,7 @@ def low(pc, lo=40):
 
 def hz(k): return 440.0 * 2 ** ((k - 69) / 12)
 
-def build(sgemf, stems=None):
+def build_metal(sgemf, stems=None):
     z = zipfile.ZipFile(sgemf)
     pf = PF(z)
     rng = np.random.default_rng(1997)
@@ -358,10 +359,176 @@ def build(sgemf, stems=None):
     mix *= 0.89 / np.abs(mix).max()
     return (mix * 32767).astype(np.int16)
 
+# ---------------------------------------------------------------------------
+# second style: eurobeat / dance, with Pocket Fighter's own instruments only
+TRIAD = {9: (0, 3, 7), 2: (0, 3, 7), 4: (0, 4, 7), 5: (0, 4, 7), 7: (0, 4, 7), 0: (0, 4, 7),
+         10: (0, 4, 7), 11: (0, 3, 6), 8: (0, 3, 6)}
+
+def master(mix, rng, sends):
+    from scipy.signal import fftconvolve
+    n = int(TOTAL * SR)
+    ir_n = int(1.6 * SR)
+    ir = np.exp(-np.arange(ir_n) / (0.35 * SR)) * rng.normal(0, 1, (2, ir_n))
+    ir /= np.sqrt((ir ** 2).sum(1, keepdims=True))
+    wet = np.stack([fftconvolve(sends, ir[c])[:len(sends)] for c in range(2)], 1)
+    mix = mix + 0.3 * wet
+    tail = mix[n:]
+    mix = mix[:n].copy()
+    mix[:len(tail)] += tail[:n]
+    peak = np.percentile(np.abs(mix), 99.97)
+    mix = np.tanh(mix / peak * 1.1) / np.tanh(1.1)
+    mix *= 0.89 / np.abs(mix).max()
+    return (mix * 32767).astype(np.int16)
+
+def build_dance(sgemf, stems=None):
+    z = zipfile.ZipFile(sgemf)
+    pf = PF(z)
+    rng = np.random.default_rng(1997)
+    mel = pf.track(2)
+    lowmel = [n for n in pf.track(0) if 48 <= n[0] < 64]
+    bass = pf.track(1)
+    pad = pf.track(4)
+    roots = roots_of(bass, 20)
+    kit = {name: pf.instrument(0, p) for name, p in
+           dict(kick=0, kick2=10, snare=1, hat=2, ohat=3, crash=4, clap=14, tomh=7, toml=9).items()}
+    I = {n: pf.instrument(0, p) for n, p in dict(bass=32, lead=33, lead2=34, brass=41, stab=55, pad=62).items()}
+    buses = {n: Bus() for n in ('kick', 'drums', 'bass', 'stab', 'arp', 'lead', 'harm', 'pad')}
+    T = lambda gbar, beat: (gbar * 4 + beat) * BEAT
+
+    def hit(name, gbar, beat, gain=1.0, bus='drums'):
+        ins = kit[name]
+        buses[bus].add(T(gbar, beat), play_sample(ins, ins['unity'], 0.5) * gain)
+
+    def note(bus, ins, gbar, beat, key, length, gain=1.0, release=0.06):
+        buses[bus].add(T(gbar, beat), play_sample(I[ins], key, length * BEAT, gain, release))
+
+    def triad(pc, tr, base=60):
+        r = (pc + tr) % 12
+        k = base + ((r - base) % 12)
+        return [k + iv for iv in TRIAD.get(pc, (0, 3, 7))]
+
+    plan = [('intro', 0, 4, 0)]
+    bar = 4
+    for kind, n, tr in (('theme', 20, 0), ('theme2', 20, 0), ('break', 12, 0), ('arp', 20, 0),
+                        ('theme2', 20, 0), ('final', 20, 2), ('outro', 4, 0)):
+        plan.append((kind, bar, n, tr)); bar += n
+    assert bar == BARS
+
+    def drums(g, tb, kind, i_in_section, n_section):
+        if kind == 'break':
+            # no kick: a snare roll building over the last 4 bars
+            if i_in_section >= n_section - 4:
+                k = i_in_section - (n_section - 4)
+                step = (1, 2, 4, 8)[k]
+                for s in range(4 * step):
+                    hit('snare', g, s / step, 0.3 + 0.15 * k)
+            for b in range(4): hit('hat', g, b + 0.5, 0.25)
+            return
+        for b in range(4):
+            hit('kick2', g, b, 1.0, 'kick'); hit('kick', g, b, 0.5, 'kick')
+            hit('ohat', g, b + 0.5, 0.45)
+            for s in (0.25, 0.75): hit('hat', g, b + s, 0.25)
+        hit('clap', g, 1, 0.8); hit('clap', g, 3, 0.8)
+        hit('snare', g, 1, 0.5); hit('snare', g, 3, 0.5)
+        if tb % 4 == 0: hit('crash', g, 0, 0.7)
+        if tb % 8 == 7:
+            for s in range(4): hit('snare', g, 3 + s / 4, 0.35 + 0.1 * s)
+
+    def theme_bar(g, tb, kind, tr, i_in_section, n_section):
+        r = [roots[tb * 4 + j] for j in range(4)]
+        drums(g, tb, kind, i_in_section, n_section)
+        # octave bass in 8ths (eurobeat), the root of each beat
+        for j in range(4):
+            k = 33 + ((r[j] + tr - 33) % 12)
+            if kind == 'break':
+                if j == 0: note('bass', 'bass', g, 0, k, 3.8, 0.9, 0.3)
+                continue
+            note('bass', 'bass', g, j, k, 0.45, 0.95)
+            note('bass', 'bass', g, j + 0.5, k + 12, 0.45, 0.8)
+        # off-beat stabs
+        if kind != 'break':
+            for j in range(4):
+                for k in triad(r[j], tr):
+                    note('stab', 'stab', g, j + 0.5, k, 0.3, 0.32)
+        # 16th arpeggio (arp section, and quietly in theme2/final)
+        if kind in ('arp', 'theme2', 'final'):
+            for j in range(4):
+                tri = triad(r[j], tr, 72)
+                seq = [tri[0], tri[1], tri[2], tri[1] + 12 if kind == 'arp' else tri[1]]
+                for s in range(4):
+                    note('arp', 'lead2', g, j + s / 4, seq[s], 0.22, 0.5 if kind == 'arp' else 0.28)
+        # pad: the original pad line, and held chords in the breakdown
+        if kind == 'break' or 8 <= tb < 12:
+            for k in triad(r[0], tr, 57):
+                note('pad', 'pad', g, 0, k, 4.0, 0.35, 0.5)
+        # lead
+        line = [n for n in mel if tb * 4 <= n[0] < tb * 4 + 4]
+        if 12 <= tb < 16:
+            line = [n for n in lowmel if tb * 4 <= n[0] < tb * 4 + 4]
+            line = [(b, k + 12, l) for b, k, l in line]
+        if kind == 'break':
+            line = [(b, k - 12, l) for b, k, l in mel if (tb - 8) * 4 <= b - 0 < (tb - 7) * 4] if False else []
+        if kind == 'arp':
+            line = [(b, k + 12, l) for b, k, l in line if 16 <= tb]
+        for b, k, l in line:
+            note('lead', 'lead', g, b - tb * 4, k + tr, max(0.25, l), 0.9, 0.15)
+            if kind in ('theme2', 'final'):
+                note('harm', 'brass', g, b - tb * 4, third_below(k) + tr, max(0.25, l), 0.6, 0.15)
+
+    for kind, first, n, tr in plan:
+        for i in range(n):
+            g = first + i
+            if kind == 'intro':
+                # pad and a filtered beat coming in, the riff's chord
+                for k in triad(9, 0, 57):
+                    note('pad', 'pad', g, 0, k, 4.0, 0.35, 0.5)
+                if i >= 1:
+                    for b in range(4): hit('kick2', g, b, 0.4 + 0.2 * i, 'kick')
+                if i >= 2:
+                    for b in range(4): hit('ohat', g, b + 0.5, 0.3)
+                if i == 3:
+                    for s in range(8): hit('snare', g, 2 + s / 4, 0.3 + 0.08 * s)
+            elif kind == 'break':
+                theme_bar(g, 8 + (i % 4), 'break', tr, i, n)
+            elif kind == 'outro':
+                if i == 0:
+                    hit('crash', g, 0); hit('kick2', g, 0, 1.0, 'kick')
+                    for k in triad(9, 0, 57): note('pad', 'pad', g, 0, k, 8.0, 0.4, 1.0)
+                    note('bass', 'bass', g, 0, 33, 4.0, 0.9, 0.5)
+            else:
+                theme_bar(g, i, kind, tr, i, n)
+
+    # mix: everything but the drums ducks under the kick (side-chain pump)
+    n = len(buses['kick'].x)
+    env = np.ones(n)
+    beat_n = int(BEAT * SR)
+    duck = 1 - 0.45 * np.exp(-np.arange(beat_n) / (0.06 * SR))
+    for b in range(BARS * 4):
+        i = int(b * BEAT * SR)
+        if i + beat_n <= n: env[i:i + beat_n] = np.minimum(env[i:i + beat_n], duck)
+    x = buses
+    mix = (pan(1.0 * x['kick'].x, 0) + pan(0.8 * x['drums'].x, 0.1)
+           + pan(0.8 * x['bass'].x * env, 0)
+           + pan(0.55 * x['stab'].x * env, -0.35) + pan(0.55 * x['stab'].x * env, 0.35) * 0.0
+           + pan(0.45 * x['arp'].x * env, 0.45)
+           + pan(0.9 * x['lead'].x, 0) + pan(0.55 * x['harm'].x, -0.3)
+           + pan(0.5 * x['pad'].x * env, -0.5) + pan(0.5 * x['pad'].x * env, 0.5))
+    if stems is not None:
+        stems.update({k: v.x for k, v in buses.items()})
+    sends = 0.3 * x['lead'].x + 0.2 * x['harm'].x + 0.3 * x['pad'].x + 0.15 * x['stab'].x + 0.2 * x['arp'].x
+    return master(mix, rng, sends)
+
+STYLES = {'metal': build_metal, 'dance': build_dance}
+
+def build(sgemf, style='dance', stems=None):
+    return STYLES[style](sgemf, stems)
+
 def main(a):
+    style = 'dance'
+    if len(a) == 4 and a[2] == '--style': style = a[3]; a = a[:2]
     if len(a) != 2:
         print(__doc__); sys.exit(1)
-    pcm = build(a[0])
+    pcm = build(a[0], style)
     import wave
     w = wave.open(a[1], 'wb'); w.setnchannels(2); w.setsampwidth(2); w.setframerate(SR)
     w.writeframes(pcm.tobytes()); w.close()
