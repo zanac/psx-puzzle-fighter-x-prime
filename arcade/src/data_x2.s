@@ -23,15 +23,29 @@ dc.w 4, 2, 4, 3, 4, 1, 0, 0
 dc.w 4, 1, 4, 2, 4, 3, 0, 0
 dc.w 4, 1, 4, 2, 4, 3, 0, 0
 
-| Receive rate /20 (KScl's table at 0x10120, by character): Dan 22, then slot 11
+| Receive rate /20 (KScl's table at 0x10120, by character): Dan 22, then
+| slot 11 = Zangief 18 (code_zangief.s gives him index 11)
 | !!! INSERT AT: 01012A
 | !!! LENGTH: 0x2
-dc.b 0x16, 0x14
+dc.b 0x16, 0x12
 
-| Send rate /20 (KScl's table at 0x10140): Dan 22
+| Send rate /20 (KScl's table at 0x10140): Dan 22, Zangief 18
 | !!! INSERT AT: 01014A
 | !!! LENGTH: 0x2
-dc.b 0x16, 0x14
+dc.b 0x16, 0x12
+
+| =============================================================================
+| ZANGIEF: "Siberian Bear" drop pattern (3x2 blocks), as on the PSX
+| =============================================================================
+| !!! INSERT AT: 09F400
+| !!! LENGTH: 0xC0
+zg_pattern:
+.rept 3
+dc.w 3, 3, 3, 2, 2, 2, 0, 0
+dc.w 3, 3, 3, 2, 2, 2, 0, 0
+dc.w 4, 4, 4, 1, 1, 1, 0, 0
+dc.w 4, 4, 4, 1, 1, 1, 0, 0
+.endr
 
 | =============================================================================
 | TITLE TEXT (KScl's string slot at 0x3F900, followed by free space)

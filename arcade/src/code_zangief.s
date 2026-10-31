@@ -36,6 +36,20 @@ jsr    xp_zanim
 | !!! LENGTH: 0xA
 jmp    xp_ftype
 
+| drop pattern of the attacker (0xFF56: a2 = attacker, a3 = 0x10188 + row)
+| !!! INSERT AT: 0FF56
+| !!! LENGTH: 0x10
+jsr    xp_zpat
+
+| damage rates (KScl, 0xFDD2 / 0xFDE4: d2 = character of a1 / fp): Zangief = 11
+| !!! INSERT AT: 0FDD2
+| !!! LENGTH: 0x6
+jsr    xp_zidx_a1
+
+| !!! INSERT AT: 0FDE4
+| !!! LENGTH: 0x6
+jsr    xp_zidx_fp
+
 | match HUD name (0x16C78: a0 = list of the character's name, fp = player)
 | !!! INSERT AT: 16C78
 | !!! LENGTH: 0x8
@@ -78,6 +92,63 @@ moveq  #0, %d0
 zm_bit:
 and.b  XP_ZBITS, %d0
 movem.l (%sp)+, %d0                 | (movem does not touch the flags)
+rts
+
+xp_zpat:
+move.l %a0, -(%sp)
+movea.l %a2, %a0
+bsr.b  xp_zis_ok
+movea.l (%sp)+, %a0
+beq.b  zp_dan
+suba.l #0x10188, %a3
+adda.l #zg_pattern, %a3
+rts
+zp_dan:
+moveq  #0, %d0
+move.b 0x82(%a2), %d0
+beq.b  zp_done
+zp_row:
+lea    0xC0(%a3), %a3
+subq.w #1, %d0
+bne.b  zp_row
+zp_done:
+rts
+
+xp_zidx_a1:
+move.l %a0, -(%sp)
+movea.l %a1, %a0
+bra.b  zx_go
+xp_zidx_fp:
+move.l %a0, -(%sp)
+movea.l %fp, %a0
+zx_go:
+moveq  #0, %d2
+move.b 0x82(%a0), %d2
+bsr.b  xp_zis_ok
+beq.b  zx_out
+moveq  #11, %d2
+zx_out:
+movea.l (%sp)+, %a0
+rts
+
+| Z set when the player struct at a0 is NOT Zangief
+xp_zis_ok:
+movem.l %d0, -(%sp)
+cmpi.b #10, 0x82(%a0)
+bne.b  zo_no
+moveq  #1, %d0
+cmpa.l #PLAYER1, %a0
+beq.b  zo_bit
+moveq  #2, %d0
+cmpa.l #PLAYER2, %a0
+bne.b  zo_no
+zo_bit:
+and.b  XP_ZBITS, %d0
+movem.l (%sp)+, %d0
+rts
+zo_no:
+moveq  #0, %d0
+movem.l (%sp)+, %d0
 rts
 
 xp_zname:
