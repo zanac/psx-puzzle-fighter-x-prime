@@ -16,6 +16,10 @@ SCALE = 0.9
 ZBLOB = 0x90000             # must match arcade/src/code_zangief.s
 N_STATES = 63               # Dan's state table (0x7AB6C): 63 words
 PALOFF = 0x80               # palette (16 words) in the blob
+INTROFF = 0xA0              # the Akuma ambush intruder's state table (16 words, code_arcade.s)
+N_INTR = 16
+# the intruder (0x27C54, Dan's states 9 run in / 4 taunt / 7 hit, moved by code)
+INTR_STATES = {9: 'idle', 4: 'taunt', 7: 'ko'}
 TILE0 = 0x8000              # first sprite code of the new graphics
 DAN_PAL_ATTR = 0x0C         # Dan's sprite palette (P1; P2 adds 4)
 
@@ -133,7 +137,7 @@ def build(pf_prog, pf_gfx, verbose=False):
     S = build_anims(P)
     pals = {p: np.array([rgb(struct.unpack('>H', pf_prog[a + 2 * i:a + 2 * i + 2])[0]) for i in range(16)],
                         np.uint8) for p, a in PF_PALS.items()}
-    used = sorted({fr for name in set(STATES.values()) for _, fr in S[name][0]}, key=str)
+    used = sorted({fr for name in set(STATES.values()) | set(INTR_STATES.values()) for _, fr in S[name][0]}, key=str)
     # frames: scaled RGBA around the feet
     SZ, OX, OY = 256, 128, 200
     imgs = {}
@@ -183,6 +187,7 @@ def build(pf_prog, pf_gfx, verbose=False):
     blob = bytearray(b'\0' * PALOFF)
     pal = [0xF000 | ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4) for r, g, b in qp.tolist()] + [0xF000]
     blob += struct.pack('>16H', *pal)
+    blob += bytes(2 * N_INTR)
     fpos = {}
     def addr(): return ZBLOB + len(blob)
     for fr, spr in frames.items():           # position lists, then frames
@@ -196,7 +201,7 @@ def build(pf_prog, pf_gfx, verbose=False):
         for x, y, c in spr or [(0, 0, TILE0)]:
             blob += struct.pack('>HH', c, DAN_PAL_ATTR)
     sptr = {}
-    for name in sorted(set(STATES.values())):
+    for name in sorted(set(STATES.values()) | set(INTR_STATES.values())):
         ents, loop = S[name]
         start = addr(); sptr[name] = start - ZBLOB
         for i, (dur, fr) in enumerate(ents):
@@ -208,6 +213,8 @@ def build(pf_prog, pf_gfx, verbose=False):
                 blob += struct.pack('>I', tgt)
     for s, name in STATES.items():
         struct.pack_into('>H', blob, 2 * s, sptr[name])
+    for s, name in INTR_STATES.items():
+        struct.pack_into('>H', blob, INTROFF + 2 * s, sptr[name] - INTROFF)
     if len(blob) > 0x10000: raise SystemExit('zangief blob too big: %x' % len(blob))
     if verbose:
         print('zangief: %d frames, %d tiles, blob %x bytes' % (len(frames), len(tiles), len(blob)))

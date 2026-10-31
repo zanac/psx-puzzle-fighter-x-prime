@@ -50,6 +50,25 @@ jsr    xp_zcpu
 | !!! LENGTH: 0xC
 jsr    xp_zcont
 
+| Akuma's ambush (when the CPU is Dan): an intruder object (0x27C54) runs in,
+| taunts and is beaten; its animations come from Dan's table 0x7AB6C at four
+| places. When the CPU fighter it stands for (+0x32) is Zangief: his.
+| !!! INSERT AT: 27CBE
+| !!! LENGTH: 0x6
+jsr    xp_zintr
+
+| !!! INSERT AT: 27D16
+| !!! LENGTH: 0x6
+jsr    xp_zintr
+
+| !!! INSERT AT: 27D40
+| !!! LENGTH: 0x6
+jsr    xp_zintr
+
+| !!! INSERT AT: 27D5A
+| !!! LENGTH: 0x6
+jsr    xp_zintr
+
 | !!! INSERT AT: 0F1200
 | !!! LENGTH: 0x200
 xp_zorder:
@@ -143,6 +162,50 @@ dbf    %d1, zt_copy
 zt_dan:
 movem.l (%sp)+, %d0-%d1/%a0-%a1
 zt_out:
+rts
+
+| d0 = state, fp = the intruder -> a0 = the state table
+xp_zintr:
+lea    0x7AB6C, %a0
+movem.l %d0-%d1/%a1, -(%sp)
+moveq  #0, %d1
+move.w 0x32(%fp), %d1
+ori.l  #0xFF0000, %d1
+cmpi.l #0xFF8B00, %d1
+beq.b  zi_p1
+cmpi.l #0xFF8C00, %d1
+bne.b  zi_out
+moveq  #1, %d1
+bra.b  zi_bit
+zi_p1:
+moveq  #0, %d1
+zi_bit:
+btst   %d1, XP_ZBITS
+beq.b  zi_out
+lea    ZBLOB + 0xA0, %a1            | his intruder table (tools/arcade_zangief.py)
+andi.w #0xFF, %d0
+add.w  %d0, %d0
+tst.w  0(%a1, %d0.w)
+beq.b  zi_out
+movea.l %a1, %a0
+moveq  #0x0C, %d1                   | his palette over the slot his frames use
+tst.b  0x0C(%fp)
+bpl.b  zi_slot
+add.b  0x0D(%fp), %d1
+andi.w #0x1F, %d1
+zi_slot:
+lsl.w  #5, %d1
+lea    0x90C000, %a1
+adda.w %d1, %a1
+move.l %a0, -(%sp)
+lea    ZBLOB + 0x80, %a0
+moveq  #7, %d1
+zi_copy:
+move.l (%a0)+, (%a1)+
+dbf    %d1, zi_copy
+movea.l (%sp)+, %a0
+zi_out:
+movem.l (%sp)+, %d0-%d1/%a1
 rts
 
 xp_zcpu2:
