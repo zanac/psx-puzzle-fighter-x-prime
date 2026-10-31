@@ -19,6 +19,7 @@
 .set FELICIA,    6
 .set PLAYER1,    0xFF8300
 .set PLAYER2,    0xFF8700
+.set ZBLOB,      0x90000
 
 | STAGE screen: stage (0xFF8112) < 8 ?
 | !!! INSERT AT: 07F50
@@ -41,6 +42,13 @@ jmp    xp_zorder
 | !!! INSERT AT: 0BA9A
 | !!! LENGTH: 0x8
 jsr    xp_zcpu
+
+| CONTINUE screen (and others): a fighter-sized figure whose animation is
+| taken from the character's state table directly (0x243D8: d0 = state, fp+3
+| = character, a4 = player struct; 0x243DC-0x243E7 look the base up)
+| !!! INSERT AT: 243DC
+| !!! LENGTH: 0xC
+jsr    xp_zcont
 
 | !!! INSERT AT: 0F1200
 | !!! LENGTH: 0x200
@@ -96,6 +104,45 @@ zs_out:
 movem.l (%sp)+, %d0-%d1/%a0/%a2
 move.w A5 + 0x112, %d1              | the two instructions replaced
 cmpi.w #8, %d1                      | (the flags go back with the rts)
+rts
+
+xp_zcont:
+moveq  #0, %d1
+move.b 3(%fp), %d1
+lsl.w  #2, %d1
+lea    xp_animbase, %a0             | code_zangief.s (the copy of 0x243FC's table)
+movea.l 0(%a0, %d1.w), %a0
+cmpi.b #10, 3(%fp)
+bne.b  zt_out
+movem.l %d0-%d1/%a0-%a1, -(%sp)
+move.l %a4, %d1
+andi.l #0xFFFFFF, %d1
+movea.l %d1, %a0
+jsr    xp_zis_ok                    | Z: not Zangief
+beq.b  zt_dan
+lea    ZBLOB, %a1
+andi.w #0xFF, %d0
+add.w  %d0, %d0
+tst.w  0(%a1, %d0.w)
+beq.b  zt_dan
+move.l %a1, 8(%sp)                  | the a0 to give back
+moveq  #0x0C, %d1                   | his palette over the slot his frames use
+tst.b  0x0C(%fp)
+bpl.b  zt_slot
+add.b  0x0D(%fp), %d1
+andi.w #0x1F, %d1
+zt_slot:
+lsl.w  #5, %d1
+lea    0x90C000, %a0
+adda.w %d1, %a0
+lea    ZBLOB + 0x80, %a1
+moveq  #7, %d1
+zt_copy:
+move.l (%a1)+, (%a0)+
+dbf    %d1, zt_copy
+zt_dan:
+movem.l (%sp)+, %d0-%d1/%a0-%a1
+zt_out:
 rts
 
 xp_zcpu2:

@@ -54,6 +54,7 @@ ZPREV = 0x9F500             # Zangief's Counter Gem block (code_select.s)
 ZSELNAME = 0x9F700          # his select screen name: pseudo entry, frame, positions (code_select.s)
 ZPORT = 0x9F800             # his select portrait: pseudo entry, palette, positions, frame (code_select.s)
 ZWIN = 0x9D000              # his WINNER screen picture, same layout (code_quotes.s)
+ZCRED = 0x9C000             # his staff roll picture (code_quotes.s)
 WIN_DX = 36                 # left of the object, where the others' pictures sit (Ryu's)
 
 def picture(base, idx, pal, x0, y0, ztiles):
@@ -161,8 +162,11 @@ def build(spf2t, sgemf, out, verbose=True):
     # his WINNER screen picture: the same Pocket Fighter portrait, full body
     wi, wp = cps2icons.zangief_winner(pfgfx2, pfprog)
     win = picture(ZWIN, wi, wp, -(wi.shape[1] // 2) - WIN_DX, -(wi.shape[0] // 2), ztiles)
+    # and in the ending's staff roll: centred, as tall as the others' (~180 pixels)
+    ci, cp = cps2icons.zangief_winner(pfgfx2, pfprog, cps2icons.CRED_SCALE)
+    cred = picture(ZCRED, ci, cp, -(ci.shape[1] // 2), -(ci.shape[0] // 2), ztiles)
     quotes, _ = cps2quotes.build(pfprog)
-    p04 = cps2patch.put(p04, 0x80000, [(arcade_zangief.ZBLOB, zblob), (ZICONS, icons), (ZSELNAME, selname), (ZPORT, port), (ZWIN, win),
+    p04 = cps2patch.put(p04, 0x80000, [(arcade_zangief.ZBLOB, zblob), (ZICONS, icons), (ZSELNAME, selname), (ZPORT, port), (ZWIN, win), (ZCRED, cred),
                                        (cps2quotes.ZQUOTES, quotes)])
     files = {'pzfen.03': p03, 'pzfen.04': p04}
     for g, data in zip(('13m', '15m', '17m', '19m'), arcade_zangief.gfx_roms(ztiles)):

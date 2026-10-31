@@ -99,12 +99,13 @@ def pf_portrait_rgba(pfgfx, pfprog):
 
 # --- WINNER screen picture (full body, about as wide as the others (Ryu ~130 pixels)) -------
 WIN_SCALE = 0.72
+CRED_SCALE = 0.85            # the ending's staff roll (Ryu's picture is ~190 pixels high)
 
-def zangief_winner(pfgfx, pfprog):
+def zangief_winner(pfgfx, pfprog, scale=WIN_SCALE):
     """index image (15 = transparent) and palette words"""
     from PIL import Image
     im = Image.fromarray(pf_portrait_rgba(pfgfx, pfprog), 'RGBA')
-    im = im.resize((round(im.width * WIN_SCALE), round(im.height * WIN_SCALE)), Image.LANCZOS)
+    im = im.resize((round(im.width * scale), round(im.height * scale)), Image.LANCZOS)
     a = np.array(im)
     return quantise(a[..., :3], a[..., 3] > 128)
 

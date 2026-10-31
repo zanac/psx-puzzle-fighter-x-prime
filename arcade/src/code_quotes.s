@@ -17,7 +17,9 @@
 .set A5,         0xFF8000
 .set ZQUOTES,    0x9E000            | 4 x 136 bytes of text, then 4 line counts
 .set ZQ_FIRST,   44
+.set XP_ZBITS,   0xFF3010
 .set ZWIN,       0x9D000            | pseudo entry, palette (+8), positions, frame
+.set ZCRED,      0x9C000            | the staff roll's (bigger, centred), same layout
 
 | !!! INSERT AT: 23B5C
 | !!! LENGTH: 0x8
@@ -26,6 +28,12 @@ jmp    xp_zwinpic
 | !!! INSERT AT: 23C34
 | !!! LENGTH: 0x8
 jmp    xp_zwinpic
+
+| the same picture in the staff roll of the ending (0x23C84: d0 = the player's
+| character from 0xFF8130, no player struct; dimmed, d6 = 0xC000C000)
+| !!! INSERT AT: 23C84
+| !!! LENGTH: 0x8
+jmp    xp_zcredpic
 
 | quote index: d0 = random 0-3 (the hook replaces everything up to the rts)
 | !!! INSERT AT: 0BC64
@@ -64,10 +72,35 @@ andi.l #0xFFFFFF, %d1
 movea.l %d1, %a0
 jsr    xp_zis_ok                    | code_zangief.s (Z: not Zangief)
 movea.l (%sp)+, %a0
-bne.b  zw_his
+beq.b  zw_game
+move.l %a2, -(%sp)
+lea    ZWIN, %a2
+bra.b  zw_his
+zw_game:
 jmp    0x23C94                      | the game's: entry from 0x7DAC6[d0]
+
+| d0 = character; Zangief if Dan's slot and the human side's bit is set (the
+| side whose player struct has +0x9E clear: not the CPU)
+xp_zcredpic:
+cmpi.b #10, %d0
+bne.b  zk_game
+move.l %d1, -(%sp)
+moveq  #1, %d1                      | P1's bit
+tst.b  0xFF839E
+beq.b  zk_side
+moveq  #2, %d1
+zk_side:
+and.b  XP_ZBITS, %d1
+movem.l (%sp)+, %d1                 | (flags kept)
+beq.b  zk_game
+move.l %a2, -(%sp)
+lea    ZCRED, %a2
+bra.b  zw_his
+zk_game:
+jmp    0x23C94
+
 zw_his:
-movem.l %d0/%a0-%a1, -(%sp)
+movem.l %d0-%d2/%a0-%a1, -(%sp)
 moveq  #0, %d0
 tst.b  12(%fp)
 bpl.b  zw_slot
@@ -77,13 +110,19 @@ zw_slot:
 lsl.w  #5, %d0
 lea    0x90C000, %a1
 adda.w %d0, %a1
-lea    ZWIN + 8, %a0
-moveq  #7, %d0
-zw_copy:
-move.l (%a0)+, (%a1)+
+lea    8(%a2), %a0
+moveq  #15, %d0
+zw_copy:                            | with the brightness of the call (d6)
+move.w (%a0)+, %d1
+andi.w #0x0FFF, %d1
+move.w %d6, %d2
+andi.w #0xF000, %d2
+or.w   %d2, %d1
+move.w %d1, (%a1)+
 dbf    %d0, zw_copy
-move.l #ZWIN, 28(%fp)
-movem.l (%sp)+, %d0/%a0-%a1
+move.l %a2, 28(%fp)
+movem.l (%sp)+, %d0-%d2/%a0-%a1
+movea.l (%sp)+, %a2
 rts
 
 xp_zqtext:
