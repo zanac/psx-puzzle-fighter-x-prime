@@ -13,6 +13,8 @@
 .set ICON_PAL0,  8
 .set CUR1,       0xFF0C82           | +1 position (P1); P2 at +4
 .set POS_ZG,     0x01               | KScl navigation positions (row 0)
+.set ZPORT,      0x9F800            | his portrait: pseudo entry, palette (+8), ...
+.set XP_PORTOBJ, 0xFF3020           | the portrait objects (P1, P2) last set to his
 .set ZSELNAME,   0x9F700            | his name: pseudo entry (dur/flags, frame)
 .set ZPREV,      0x9F500            | Zangief's Counter Gem block (header + 70 longs)
 
@@ -77,8 +79,13 @@ jsr    xp_zprev
 | !!! LENGTH: 0xE
 jsr    xp_zselname
 
+| select portrait (0x2512C: a0 = cursor struct, d0 = 2 * (char + 35))
+| !!! INSERT AT: 2512C
+| !!! LENGTH: 0x12
+jsr    xp_zport
+
 | !!! INSERT AT: 0F0C00
-| !!! LENGTH: 0x200
+| !!! LENGTH: 0x400
 xp_logo:
 lea    S2 + 1 * 4 + 8 * 0x40, %a1   | column 8, row 1 (was row 3)
 moveq  #0, %d0
@@ -197,6 +204,52 @@ lea    ZSELNAME, %a0
 sn_set:
 move.l %a0, 28(%fp)
 move.l (%a0), 24(%fp)
+rts
+
+xp_zport:
+cmpi.b #POS_ZG, 1(%a0)              | cursor on Zangief's icon
+beq.b  zt_his
+lea    0x7DAC6, %a0
+move.w 0(%a0, %d0.w), %d0
+lea    -4(%a0, %d0.w), %a0
+move.l %a0, 28(%fp)
+rts
+zt_his:
+lea    ZPORT, %a0
+move.l %a0, 28(%fp)
+moveq  #0, %d0
+move.b 3(%fp), %d0                  | side
+add.w  %d0, %d0
+add.w  %d0, %d0
+lea    XP_PORTOBJ, %a0
+move.l %fp, 0(%a0, %d0.w)
+rts
+
+| every frame: his portrait's palette over the slot it uses
+xp_zportpal:
+movem.l %d0-%d1/%a0-%a2, -(%sp)
+lea    XP_PORTOBJ, %a2
+moveq  #1, %d1
+zq_loop:
+movea.l (%a2)+, %a0
+move.l %a0, %d0
+beq.b  zq_next
+cmpi.l #ZPORT, 28(%a0)
+bne.b  zq_next
+moveq  #0, %d0
+move.b 13(%a0), %d0
+andi.w #31, %d0
+lsl.w  #5, %d0
+lea    0x90C000, %a1
+adda.w %d0, %a1
+lea    ZPORT + 8, %a0
+moveq  #7, %d0
+zq_copy:
+move.l (%a0)+, (%a1)+
+dbf    %d0, zq_copy
+zq_next:
+dbf    %d1, zq_loop
+movem.l (%sp)+, %d0-%d1/%a0-%a2
 rts
 
 | select hook (every frame, each player choosing): Zangief bit from the

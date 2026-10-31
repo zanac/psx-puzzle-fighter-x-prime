@@ -240,6 +240,7 @@ rts
 | every frame (from the sprite list hook): his palette over Dan's while his
 | animation runs
 xp_zpal:
+jsr    xp_zportpal                  | code_select.s
 movem.l %d0-%d1/%a0-%a1, -(%sp)
 lea    FIGHTER1, %a0
 bsr.b  zp_one

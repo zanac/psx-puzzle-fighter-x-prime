@@ -52,6 +52,7 @@ ZNAME = 0x9F000             # ZANGIEF's two HUD name lists (code_zangief.s)
 ZICONS = 0x9F100            # select icons: palettes and tile codes (code_select.s)
 ZPREV = 0x9F500             # Zangief's Counter Gem block (code_select.s)
 ZSELNAME = 0x9F700          # his select screen name: pseudo entry, frame, positions (code_select.s)
+ZPORT = 0x9F800             # his select portrait: pseudo entry, palette, positions, frame (code_select.s)
 ZG_PATTERN = [(3, 3, 3, 2, 2, 2), (3, 3, 3, 2, 2, 2), (4, 4, 4, 1, 1, 1), (4, 4, 4, 1, 1, 1)]
 
 def scroll1_art(r, gfx, p03, p04):
@@ -113,8 +114,8 @@ def build(spf2t, sgemf, out, verbose=True):
     zblob, ztiles = arcade_zangief.build(pfprog, pfgfx, verbose)
     # the new select icons: tiles after his, codes and palettes at ZICONS
     zi, zp = cps2icons.zangief(pfgfx, pfprog)
+    pfgfx2 = pfgfx
     di, dp = cps2icons.dan(cps2gfx.Gfx(gfx), swap(p03) + swap(p04))
-    del pfgfx
     codes = []
     for idx in (zi, di):
         for t in cps2icons.tiles_of(idx):
@@ -134,7 +135,21 @@ def build(spf2t, sgemf, out, verbose=True):
     selname += b''.join(struct.pack('>hh', x, y) for x, y, c in spr)
     selname += struct.pack('>HHHI', 12, len(spr), len(spr) - 1, pos)
     selname += b''.join(struct.pack('>HH', c, 0) for x, y, c in spr)
-    p04 = cps2patch.put(p04, 0x80000, [(arcade_zangief.ZBLOB, zblob), (ZICONS, icons), (ZSELNAME, selname)])
+    # his select portrait (Pocket Fighter's), 128x112 like the others, one palette
+    pi, pp = cps2icons.zangief_portrait(pfgfx2, pfprog)
+    spr = []
+    for ty in range(0, cps2icons.PORT_H, 16):
+        for tx in range(0, cps2icons.PORT_W, 16):
+            t = np.full((16, 16), 15, np.uint8); blk = pi[ty:ty + 16, tx:tx + 16]; t[:blk.shape[0], :blk.shape[1]] = blk
+            if (t == 15).all(): continue
+            spr.append((tx - 64, ty - 56, arcade_zangief.TILE0 + len(ztiles))); ztiles.append(t)
+    pos = ZPORT + 8 + 32
+    frame = pos + 4 * len(spr)
+    port = struct.pack('>II', 0x0B540000, frame) + struct.pack('>16H', *pp)
+    port += b''.join(struct.pack('>hh', x, y) for x, y, c in spr)
+    port += struct.pack('>HHHI', 12, len(spr), len(spr) - 1, pos)
+    port += b''.join(struct.pack('>HH', c, 0) for x, y, c in spr)
+    p04 = cps2patch.put(p04, 0x80000, [(arcade_zangief.ZBLOB, zblob), (ZICONS, icons), (ZSELNAME, selname), (ZPORT, port)])
     files = {'pzfen.03': p03, 'pzfen.04': p04}
     for g, data in zip(('13m', '15m', '17m', '19m'), arcade_zangief.gfx_roms(ztiles)):
         files['pzfen.' + g] = data

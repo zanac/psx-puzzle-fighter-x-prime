@@ -70,3 +70,32 @@ def dan(spfgfx, spfprog):
 
 def tiles_of(idx):
     return [idx[by * 16:by * 16 + 16, bx * 16:bx * 16 + 16].copy() for by in range(3) for bx in range(3)]
+
+# --- select portrait (128x112, as SPF2T's) -------------------------------------
+ZG_PORTRAIT = 0x1DF92A      # PF select portrait frame (bank 1: codes + 0x10000)
+ZG_PORT_PALS = {0: 0x20D008, 1: 0x20D028, 2: 0x20D048}
+PORT_W, PORT_H = 128, 112
+PORT_SCALE = 0.62
+
+def zangief_portrait(pfgfx, pfprog):
+    """index image 128x112 (15 = transparent) and its palette words"""
+    import pfarc
+    from PIL import Image
+    P = pfarc.PF(pfprog, pfgfx)
+    img, pal = P.render(ZG_PORTRAIT, bank=1, size=340, ox=120, oy=240)
+    out = np.zeros((340, 340, 4), np.uint8)
+    for p, a in ZG_PORT_PALS.items():
+        m = pal == p
+        out[m, :3] = rgb_of(struct.unpack('>16H', pfprog[a:a + 32]))[img[m]]
+        out[m, 3] = 255
+    ys, xs = np.nonzero(pal >= 0)
+    out = out[ys.min():ys.max() + 1, xs.min():xs.max() + 1]
+    im = Image.fromarray(out, 'RGBA')
+    im = im.resize((round(im.width * PORT_SCALE), round(im.height * PORT_SCALE)), Image.LANCZOS)
+    a = np.array(im)
+    x0 = max(0, (a.shape[1] - PORT_W) // 2)
+    a = a[:PORT_H, x0:x0 + PORT_W]
+    canvas = np.zeros((PORT_H, PORT_W, 4), np.uint8)
+    canvas[:a.shape[0], :a.shape[1]] = a
+    mask = canvas[..., 3] > 128
+    return quantise(canvas[..., :3], mask)
