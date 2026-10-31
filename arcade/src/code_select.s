@@ -84,6 +84,16 @@ jsr    xp_zselname
 | !!! LENGTH: 0x12
 jsr    xp_zport
 
+| same character -> the alternate colours (0x7968 on confirming, 0x7FC6 when a
+| challenge sets both): Zangief and Dan are not the same character any more
+| !!! INSERT AT: 07968
+| !!! LENGTH: 0x8
+jsr    xp_samech
+
+| !!! INSERT AT: 07FC6
+| !!! LENGTH: 0x8
+jsr    xp_samech
+
 | !!! INSERT AT: 0F0C00
 | !!! LENGTH: 0x400
 xp_logo:
@@ -250,6 +260,37 @@ dbf    %d0, zq_copy
 zq_next:
 dbf    %d1, zq_loop
 movem.l (%sp)+, %d0-%d1/%a0-%a2
+rts
+
+| Z set if the objects/structs at fp and a0 have the same character, Zangief
+| counting as his own (bit of each one's side: 0xFF83/0xFF8B P1, 0xFF87/0xFF8C P2)
+xp_samech:
+movem.l %d0-%d2, -(%sp)
+move.b 0x82(%fp), %d0
+cmp.b  0x82(%a0), %d0
+bne.b  sc_out                       | Z clear: different
+cmpi.b #10, %d0
+bne.b  sc_out                       | Z set: same, not Dan's slot
+move.l %fp, %d0
+bsr.b  sc_side
+move.b %d2, %d1
+move.l %a0, %d0
+bsr.b  sc_side
+cmp.b  %d1, %d2                     | Z set when both or neither are Zangief
+sc_out:
+movem.l (%sp)+, %d0-%d2             | (movem keeps the flags)
+rts
+sc_side:                            | d0 = address -> d2 = its Zangief bit (0/1)
+andi.l #0xFFFF00, %d0
+moveq  #0, %d2
+cmpi.l #0xFF8300, %d0
+beq.b  sd_p1
+cmpi.l #0xFF8B00, %d0
+beq.b  sd_p1
+moveq  #1, %d2
+sd_p1:
+btst   %d2, XP_ZBITS
+sne    %d2
 rts
 
 | select hook (every frame, each player choosing): Zangief bit from the
