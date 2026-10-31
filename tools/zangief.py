@@ -22,7 +22,7 @@ Output: an SPF2T character file with the usual two entries.
 
 Frames: Pocket Fighter records are composited (costume overlays: a record with
 flag bit 0 is drawn with the next record on top), kept facing left (the game mirrors P1),
-scaled to 0.65 around the feet anchor and quantised to one 15-colour palette.
+scaled to SCALE (0.9, as on the arcade set) around the feet anchor and quantised to one 15-colour palette.
 The Spinning Piledriver frames get a vertical lift (jumps are object motion in
 Pocket Fighter, not part of the frames).
 
@@ -38,7 +38,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pf_sprites as P
 import lzh
 
-SCALE = 0.65
+SCALE = 0.9
 PALOFF = 0x2C00             # must match src/zangief.asm
 LISTOFF = 0x2F00
 BANK_MAX = 0x4500
@@ -222,12 +222,34 @@ def lz_fast(hw):
             i += 1
     return lzh._pack(items)
 
+def grid_origin(img, bb):
+    """the 16x16 cell grid's origin (at most 15 pixels up / left of the
+    bounding box) with the fewest non-empty cells: a frame may use 48 cells
+    (the game's VRAM area per player)"""
+    import numpy as np
+    a = np.asarray(img.getchannel('A')) > 0
+    best = None
+    for dy in range(16):
+        for dx in range(16):
+            x0, y0 = bb[0] - dx, bb[1] - dy
+            if x0 < 0 or y0 < 0:
+                continue
+            sub = a[y0:bb[3], x0:bb[2]]
+            h, w = sub.shape
+            pad = np.zeros(((h + 15) // 16 * 16, (w + 15) // 16 * 16), bool)
+            pad[:h, :w] = sub
+            n = int(pad.reshape(pad.shape[0] // 16, 16, pad.shape[1] // 16, 16).any(axis=(1, 3)).sum())
+            key = (n, dx + dy)
+            if best is None or key < best[0]:
+                best = (key, x0, y0)
+    return (best[1], best[2]) if best else (bb[0], bb[1])
+
 def make_record(img, ox, oy, cols, cache):
     """img: RGBA, origin (ox, oy). -> (record bytes without offset, LZ bytes)"""
     bb = img.getbbox()
     if not bb:
         bb = (ox, oy - 1, ox + 1, oy)
-    x0, y0 = bb[0], bb[1]
+    x0, y0 = grid_origin(img, bb)
     cw, ch = (bb[2] - x0 + 15) // 16, (bb[3] - y0 + 15) // 16
     assert cw <= 17 and cw * ch <= 256, (cw, ch)
     data = img.load()
