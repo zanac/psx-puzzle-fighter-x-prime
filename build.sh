@@ -1,7 +1,8 @@
 #!/bin/sh
 # Build Super Puzzle Fighter II Turbo X" (PSX) from your own discs.
 #
-# usage: ./build.sh <SPF2T image> <Pocket Fighter image> <output> [armips]
+# usage: ./build.sh [--arcade <spf2t.zip> <sgemf.zip>] <SPF2T image>
+#                   <Pocket Fighter image> <output> [armips]
 #
 # SPF2T:  Super Puzzle Fighter II Turbo NTSC-U (SLUS-00418)
 # PF:     Pocket Fighter NTSC-U (SLUS-00653): Zangief's graphics, voices,
@@ -14,10 +15,19 @@
 #         from src/ (XP_MKPATCH=<file.json> then also writes the patch).
 # Extra:  XP_NEWFILES="NAME=FILE ..." adds files to /DATA (new file ids after
 #         Zangief's, in that order; needs armips).
+# Arcade: --arcade also builds the CPS2 set spf2enh.zip, next to <output>,
+#         from your MAME sets spf2t and sgemf (see build_arcade.sh).
 set -e
 
+ARC_SPF=""
+ARC_PF=""
+if [ "${1:-}" = "--arcade" ]; then
+	ARC_SPF=$2
+	ARC_PF=$3
+	shift 3
+fi
 if [ $# -lt 3 ]; then
-	sed -n '2,17p' "$0"
+	sed -n '2,21p' "$0"
 	exit 1
 fi
 
@@ -102,3 +112,6 @@ python3 "$HERE/tools/makedisc.py" "$IN" "$OUT" \
 	"/DATA/FIRSTE.EMI=$TMP/FIRSTE.EMI.xp" \
 	"/DATA/SELECT.EMI=$TMP/SELECT.EMI.xp" $ADDS
 echo "done: $OUT"
+if [ -n "$ARC_SPF" ]; then
+	"$HERE/build_arcade.sh" "$ARC_SPF" "$ARC_PF" "$(dirname "$OUT")/spf2enh.zip"
+fi
