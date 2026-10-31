@@ -1,0 +1,130 @@
+| X" on the arcade set: Zangief in Arcade (VS COM).
+|
+| The opponents: when Arcade starts, 0xBAB2 copies a 16-byte order (0xBC78 +
+| 16 * random row) to 0xFF0CA6: characters 0-7 in some order, then Dan
+| (0x0A); Devilot may take place 6 and Akuma place 8. Each STAGE screen
+| (0x7F50) takes the opponent of the stage (0xFF8112) from it and writes it
+| as the CPU's character (0x7FB6); 0xBA80 does the same for the first one not
+| beaten yet (bits in 0xFF8110) when a match is set up from elsewhere.
+|
+| - His order (as on the PSX): when the human player is Zangief, Felicia (6),
+|   his Pocket Fighter rival, is moved to place 7: the 8th opponent, before
+|   Dan and the bosses.
+| - CPU challenger: in another character's run, Zangief takes Dan's place one
+|   time in two (the CPU's Zangief bit); otherwise the CPU's bit is cleared.
+
+.set A5,         0xFF8000
+.set XP_ZBITS,   0xFF3010
+.set ORDER,      0xFF0CA6           | a5 - 0x735A
+.set FELICIA,    6
+.set PLAYER1,    0xFF8300
+.set PLAYER2,    0xFF8700
+
+| STAGE screen: stage (0xFF8112) < 8 ?
+| !!! INSERT AT: 07F50
+| !!! LENGTH: 0x8
+jsr    xp_zstage
+
+| STAGE screen: the opponent (d0) to the CPU's select object (fp) and struct
+| (a4); a0 = the human's struct
+| !!! INSERT AT: 07FB6
+| !!! LENGTH: 0x8
+jsr    xp_zcpu2
+
+| after the order is copied (a0 = the human player's struct): the rest of
+| 0xBAB2 up to the Akuma test is redone in xp_zorder
+| !!! INSERT AT: 0BADA
+| !!! LENGTH: 0x16
+jmp    xp_zorder
+
+| the CPU's character (d0 = place, d1 = character, a0 / a1 = human / CPU)
+| !!! INSERT AT: 0BA9A
+| !!! LENGTH: 0x8
+jsr    xp_zcpu
+
+| !!! INSERT AT: 0F1200
+| !!! LENGTH: 0x200
+xp_zorder:
+jsr    xp_zis_ok                    | code_zangief.s (Z: a0 is not Zangief)
+beq.b  zr_devil
+btst   #FELICIA, A5 + 0x111         | already beaten (0xFF8110 bit 6)
+bne.b  zr_devil
+lea    ORDER, %a2
+moveq  #7, %d0
+zr_find:
+cmpi.b #FELICIA, 0(%a2, %d0.w)
+beq.b  zr_swap
+dbf    %d0, zr_find
+bra.b  zr_devil
+zr_swap:
+move.b 7(%a2), 0(%a2, %d0.w)
+move.b #FELICIA, 7(%a2)
+zr_devil:                           | the game's (0xBADA-0xBAEF): Devilot in place 6
+tst.b  A5 + 0x139
+beq.b  zr_out
+move.w A5 + 0x110, %d0
+btst   #8, %d0
+bne.b  zr_out
+move.b #8, ORDER + 6
+zr_out:
+jmp    0xBAF0
+
+| Felicia to place 7 when the human player is Zangief and she has not come yet
+xp_zstage:
+movem.l %d0-%d1/%a0/%a2, -(%sp)
+lea    PLAYER1, %a0
+tst.b  0x9E(%a0)                    | +0x9E set: played by the CPU
+beq.b  zs_hum
+lea    PLAYER2, %a0
+zs_hum:
+jsr    xp_zis_ok
+beq.b  zs_out
+lea    ORDER, %a2
+move.w A5 + 0x112, %d1
+moveq  #7, %d0
+zs_find:
+cmp.w  %d1, %d0                     | only the places still to come
+bcs.b  zs_out
+cmpi.b #FELICIA, 0(%a2, %d0.w)
+beq.b  zs_swap
+dbf    %d0, zs_find
+bra.b  zs_out
+zs_swap:
+move.b 7(%a2), 0(%a2, %d0.w)
+move.b #FELICIA, 7(%a2)
+zs_out:
+movem.l (%sp)+, %d0-%d1/%a0/%a2
+move.w A5 + 0x112, %d1              | the two instructions replaced
+cmpi.w #8, %d1                      | (the flags go back with the rts)
+rts
+
+xp_zcpu2:
+move.b %d0, 0x82(%fp)               | the two instructions replaced
+move.b %d0, 0x82(%a4)
+movem.l %d0-%d2/%a0-%a1, -(%sp)
+move.b %d0, %d1
+movea.l %a4, %a1
+bra.b  zc_go
+
+xp_zcpu:
+move.w %d0, A5 + 0x112              | the two instructions replaced
+move.b %d1, 0x82(%a1)
+movem.l %d0-%d2/%a0-%a1, -(%sp)
+zc_go:
+moveq  #0, %d2                      | the CPU's bit
+cmpa.l #PLAYER1, %a1
+beq.b  zc_side
+moveq  #1, %d2
+zc_side:
+bclr   %d2, XP_ZBITS
+cmpi.b #10, %d1                     | Dan's place
+bne.b  zc_out
+jsr    xp_zis_ok                    | the human (a0) is Zangief: Dan stays
+bne.b  zc_out
+jsr    0x2DB02                      | random
+btst   #0, %d0
+beq.b  zc_out
+bset   %d2, XP_ZBITS
+zc_out:
+movem.l (%sp)+, %d0-%d2/%a0-%a1
+rts
