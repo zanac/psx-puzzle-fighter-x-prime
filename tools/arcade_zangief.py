@@ -52,8 +52,16 @@ STATES = {
     15: 'taunt', 42: 'hit',
     9: 'hit', 25: 'hitloop', 26: 'hit', 27: 'hit', 28: 'hit2', 29: 'flex',
     10: 'punch', 11: 'lariat', 12: 'pile', 13: 'pile', 14: 'bear',
-    23: 'idle', 24: 'flex',
+    23: 'idle_sel', 24: 'flex_sel',
 }
+
+# shadow under the fighter: entry byte +0x0E, index into the shadow frames at
+# 0x817B8 (Dan: 3 in the match, 4 in the still states, 0 on the select screen).
+# 11 / 12 are the 7-sprite versions of 3 / 4, for his width.
+SHADOW, SHADOW_STILL = 11, 12
+def shadow_of(name):
+    if name.endswith('_sel'): return 0
+    return SHADOW_STILL if name == 'still' else SHADOW
 
 class PFData:
     def __init__(self, prog):
@@ -99,6 +107,7 @@ def build_anims(P):
     S['hitloop'] = anim([(4, 42), (4, 43)], 0)
     S['pinch1'] = anim(P.anim(195), 0)
     S['pinch2'] = anim([(8, 485), (8, 486)], 0)
+    S['idle_sel'], S['flex_sel'] = S['idle'], S['flex']
     return S
 
 def rgb(w):
@@ -192,7 +201,8 @@ def build(pf_prog, pf_gfx, verbose=False):
         start = addr(); sptr[name] = start - ZBLOB
         for i, (dur, fr) in enumerate(ents):
             last = i == len(ents) - 1
-            blob += struct.pack('>HBBIHBBI', dur, 0x80 if last else 0, 0, fptr[fr], 0, 0, 0, 0)
+            blob += struct.pack('>HBBIHBBHBB', dur, 0x80 if last else 0, 0, fptr[fr], 0, 0, 0, 0,
+                                shadow_of(name), 0)
             if last:
                 tgt = start + 16 * (loop if loop is not None else i)
                 blob += struct.pack('>I', tgt)
