@@ -9,7 +9,7 @@ byte of game data is taken from your sets."""
 import sys, os, zipfile, zlib, tempfile, struct
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import cps2crypt, cps2patch, cps2gfx, cps2preview, cps2label, cps2icons, cps2names, cps2quotes, pfarc, arcade_zangief
+import cps2crypt, cps2patch, cps2gfx, cps2preview, cps2label, cps2icons, cps2names, cps2quotes, pfarc, arcade_zangief, qsconv
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 XP = os.path.join(HERE, 'arcade', 'xprime')
@@ -23,7 +23,8 @@ SGEMF = {   # name: crc32 (MAME sgemf); only data is read, nothing is decrypted
     'pcfu.03': 0xac2e8566, 'pcf.04': 0xf4314c96, 'pcf.05': 0x215655f6, 'pcf.06': 0xea6f13ea,
     'pcf.07': 0x5ac6d5ea, 'pcf.13m': 0x22d72ab9, 'pcf.15m': 0x16a4813c, 'pcf.17m': 0x1097e035,
     'pcf.19m': 0xd362d874, 'pcf.14m': 0x0383897c, 'pcf.16m': 0x76f91084, 'pcf.18m': 0x756c3754,
-    'pcf.20m': 0x9ec9277d}
+    'pcf.20m': 0x9ec9277d, 'pcf.01': 0x254e5f33, 'pcf.02': 0x6902f4f9, 'pcf.11m': 0xa5dea005,
+    'pcf.12m': 0x4ce235fe}
 
 def read_set(path, want):
     """{name: bytes} found by CRC (any folder, any name) or by name"""
@@ -54,6 +55,9 @@ ZPREV = 0x9F500             # Zangief's Counter Gem block (code_select.s)
 ZSELNAME = 0x9F700          # his select screen name: pseudo entry, frame, positions (code_select.s)
 ZPORT = 0x9F800             # his select portrait: pseudo entry, palette, positions, frame (code_select.s)
 ZWIN = 0x9D000              # his WINNER screen picture, same layout (code_quotes.s)
+SONGS = [(7, 24)]           # Pocket Fighter song -> SPF2T song slot: 7 the castle stage's music
+VELOCITY = 26                # note velocity of the converted songs: as loud as SPF2T's own music
+QROM_SIZE = 0x400000        # pzfen.13s, QSound 0x400000- (code banks 0x40-)
 ZCRED = 0x9C000             # his staff roll picture (code_quotes.s)
 WIN_DX = 36                 # left of the object, where the others' pictures sit (Ryu's)
 
@@ -173,7 +177,14 @@ def build(spf2t, sgemf, out, verbose=True):
         files['pzfen.' + g] = data
     for g, data in zip(('14m', '16m', '18m', '20m'), gfx):
         files['pzfen.' + g] = data
-    for n in ('pzf.01', 'pzf.02', 'pzf.11m', 'pzf.12m', 'spf2t.key'):
+    # sound: Pocket Fighter's castle music (and Zangief's voices) converted to
+    # SPF2T's driver: a new Z80 program and a new sample ROM
+    z80, q, info = qsconv.convert(s['pcf.01'] + s['pcf.02'], s['pcf.11m'] + s['pcf.12m'],
+                                  r['pzf.01'] + r['pzf.02'], r['pzf.11m'] + r['pzf.12m'], SONGS, VELOCITY)
+    if verbose: print('sound:', info)
+    files['pzfen.01'], files['pzfen.02'] = z80[:0x20000], z80[0x20000:]
+    files['pzfen.13s'] = q + bytes(QROM_SIZE - len(q))
+    for n in ('pzf.11m', 'pzf.12m', 'spf2t.key'):
         files[n] = r[n]
     zf = zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED)
     for n in sorted(files):
