@@ -380,6 +380,18 @@ def master(mix, rng, sends):
     mix *= 0.89 / np.abs(mix).max()
     return (mix * 32767).astype(np.int16)
 
+def dance_kick():
+    """a synthesised four-on-the-floor kick (909 style): a sine falling from
+    170 to 48 Hz with a short click"""
+    n = int(0.42 * SR); t = np.arange(n) / SR
+    f = 48 + 122 * np.exp(-t / 0.035)
+    ph = 2 * np.pi * np.cumsum(f) / SR
+    body = np.sin(ph) * np.exp(-t / 0.22)
+    click = np.exp(-t / 0.003) * np.random.default_rng(7).uniform(-1, 1, n) * 0.25
+    x = np.tanh(1.6 * (body + click))
+    x[:int(0.001 * SR)] *= np.linspace(0, 1, int(0.001 * SR))
+    return x / np.abs(x).max()
+
 def build_dance(sgemf, stems=None):
     z = zipfile.ZipFile(sgemf)
     pf = PF(z)
@@ -395,7 +407,11 @@ def build_dance(sgemf, stems=None):
     buses = {n: Bus() for n in ('kick', 'drums', 'bass', 'stab', 'arp', 'lead', 'harm', 'pad')}
     T = lambda gbar, beat: (gbar * 4 + beat) * BEAT
 
+    KICK = dance_kick()
     def hit(name, gbar, beat, gain=1.0, bus='drums'):
+        if name == 'kick4':
+            buses['kick'].add(T(gbar, beat), KICK * gain)
+            return
         ins = kit[name]
         buses[bus].add(T(gbar, beat), play_sample(ins, ins['unity'], 0.5) * gain)
 
@@ -425,7 +441,7 @@ def build_dance(sgemf, stems=None):
             for b in range(4): hit('hat', g, b + 0.5, 0.25)
             return
         for b in range(4):
-            hit('kick2', g, b, 1.0, 'kick'); hit('kick', g, b, 0.5, 'kick')
+            hit('kick4', g, b, 1.0); hit('kick', g, b, 0.3, 'kick')
             hit('ohat', g, b + 0.5, 0.45)
             for s in (0.25, 0.75): hit('hat', g, b + s, 0.25)
         hit('clap', g, 1, 0.8); hit('clap', g, 3, 0.8)
@@ -483,7 +499,7 @@ def build_dance(sgemf, stems=None):
                 for k in triad(9, 0, 57):
                     note('pad', 'pad', g, 0, k, 4.0, 0.35, 0.5)
                 if i >= 1:
-                    for b in range(4): hit('kick2', g, b, 0.4 + 0.2 * i, 'kick')
+                    for b in range(4): hit('kick4', g, b, 0.3 + 0.2 * i)
                 if i >= 2:
                     for b in range(4): hit('ohat', g, b + 0.5, 0.3)
                 if i == 3:
@@ -492,7 +508,7 @@ def build_dance(sgemf, stems=None):
                 theme_bar(g, 8 + (i % 4), 'break', tr, i, n)
             elif kind == 'outro':
                 if i == 0:
-                    hit('crash', g, 0); hit('kick2', g, 0, 1.0, 'kick')
+                    hit('crash', g, 0); hit('kick4', g, 0, 1.0)
                     for k in triad(9, 0, 57): note('pad', 'pad', g, 0, k, 8.0, 0.4, 1.0)
                     note('bass', 'bass', g, 0, 33, 4.0, 0.9, 0.5)
             else:
@@ -502,12 +518,12 @@ def build_dance(sgemf, stems=None):
     n = len(buses['kick'].x)
     env = np.ones(n)
     beat_n = int(BEAT * SR)
-    duck = 1 - 0.45 * np.exp(-np.arange(beat_n) / (0.06 * SR))
+    duck = 1 - 0.55 * np.exp(-np.arange(beat_n) / (0.06 * SR))
     for b in range(BARS * 4):
         i = int(b * BEAT * SR)
         if i + beat_n <= n: env[i:i + beat_n] = np.minimum(env[i:i + beat_n], duck)
     x = buses
-    mix = (pan(1.0 * x['kick'].x, 0) + pan(0.8 * x['drums'].x, 0.1)
+    mix = (pan(1.25 * x['kick'].x, 0) + pan(0.75 * x['drums'].x, 0.1)
            + pan(0.8 * x['bass'].x * env, 0)
            + pan(0.55 * x['stab'].x * env, -0.35) + pan(0.55 * x['stab'].x * env, 0.35) * 0.0
            + pan(0.45 * x['arp'].x * env, 0.45)
