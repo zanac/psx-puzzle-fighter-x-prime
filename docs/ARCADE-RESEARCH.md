@@ -109,16 +109,84 @@ then the X" patches in `arcade/src`. These notes record what is known about the
   composed by `tools/cps2label.py` (PSX method), lists at 0x9F000 / 0x9F080,
   hook 0x16C78. The labels use the PSX pixel coordinates in other colours
   (outline 8/D/C/B by row, F transparent, 0 shadow).
-- Zangief bit: 0xFF3010 (bit 0 P1, bit 1 P2). Not set by the select screen yet.
+- Zangief bit: 0xFF3010 (bit 0 P1, bit 1 P2). Set by the select screen (cursor on
+  his icon), by the CPU challenger rule (Arcade), cleared on every select set-up.
+  Every check also needs character 10, so a stale bit never matters.
 
-## Select screen (to do)
+## Select screen (done)
 
 - Scroll2 (base 0x904000, 16x16): the grid is ONE 12x6-tile picture (rows 8-13,
   columns 6-17, codes 0x7070-0x70B7); the PLAYER SELECT logo is 8x4 tiles (rows 3-6,
-  columns 8-15). Screen y = row * 16 - 16. Free: rows 1-2 above the logo, row 7.
-- Scroll2 codes reach the new graphics (0xC00000-) like sprites do.
+  columns 8-15). Screen y = row * 16 - 16. The logo moved to row 1; the new icon
+  row (Zangief, Dan) is rows 5-7, columns 9-11 and 12-14.
+- The white-bordered blue panels behind the icons are scroll1 (under scroll2 on this
+  screen, layer order 0x270E), not part of the icons: 6x6 8x8 tiles 0x780-0x788
+  (top 780 781x4 782, middle 783 784x4 785, bottom 786 787x4 788), palette 3,
+  scroll1 rows 48-59 for the grid. Scroll1 cell (c, r >= 32) = 0x900000 +
+  4 * ((r & 31) + 32 * c + 0x800); scroll1 row = 2 * scroll2 row + 32. Our row's
+  panels: scroll1 rows 42-47 (xp_panels). The icon art fills only the panel's blue
+  inside (42x42 from (3, 3), pen 5): `tools/cps2icons.py`.
 - Cursor movement: 0x789E (KScl's tables: offsets 0x3F800, navigation 0x3F840,
   8 columns x 5 rows of characters, FF = none; start positions per character
-  0x3F880). Row 0 is free for the new icon row; row 3 holds Devilot, Akuma, Dan.
+  0x3F880). Row 0 holds the new icons (positions 1, 2).
 - Select names: 0x79B0 copies the character's name tiles into scroll1 0x90212C
   (P1) / 0x90302C (P2), from the 0x84560 table (+0x0C variant).
+- Name under the pose: 0x262A0, table 0x7DB20 (0x7DB78 when a5+0x90 is set: the
+  same frames but for Hsien-Ko and Akuma), entry = table + 4 * char, frame = the
+  long after it. The same routine draws the VS screen names (a4 = player struct
+  there, select object on the select screen).
+- Same character -> alternate colours: 0x7968 (confirm) and 0x7FC6 (challenge /
+  STAGE screen pick) compare +0x82; hooked so that Zangief and Dan differ.
+
+## VS screen
+
+- Portraits: objects 0xFF9780 (P1) / 0xFF9700 (P2). 0x23B64-0x23BF8: 10 palettes
+  loaded into slots 0-9 (P1) / 10-19 (P2) by 0x23E1C (d6 = brightness), then
+  0x23C94 sets the entry from table 0x7DAC6[char + 11] (pseudo entries: the frame
+  is the long after the entry). Dan's VS frame is his select portrait (0x7FF38),
+  so Zangief's select portrait (ZPORT) is reused.
+- Fighter objects keep their select pose on this screen; +1 = 0 there (not drawn):
+  palette writes must check it.
+
+## WINNER screen
+
+- Quote: index = winner's char * 4 + random 0-3 (0xBC5A, English; Japanese uses
+  19 per character), stored in 0xFF8136. Text 0x2A744: table per language
+  (English base 0x46834), 136 bytes per quote = two lines of 34 words: glyph sprite
+  code = ASCII | 0x80, '.' = 0x134, 0 = space, bit 15 marks capitals (stripped).
+  A byte table gives the line count. Zangief: indexes 44-47 (`tools/cps2quotes.py`,
+  text from PF's arcade program at 0xD1584: length word, then ASCII + 0x30 words,
+  0x0C63 ',', 0x0C64 '.').
+- Picture: object 0xFF9B80, entry 0x7DAC6[char] (0x23B5C, a4 = winner's struct):
+  a full-body picture for 0-9, a 32x32 joke figure for Dan. Zangief: PF's select
+  portrait full body at 0.72 (ZWIN), 36 pixels left of the object like Ryu's.
+
+## Arcade (VS COM)
+
+- Opponent order: made when Arcade starts (0xBAB2): 16 bytes from 0xBC78 + 16 *
+  random row (8 rows: characters 0-7, then Dan 0x0A), copied to 0xFF0CA6; Devilot
+  may take place 6, Akuma place 8. NORMAL has 8 stages (0xFF8114 = count), then the
+  FINAL STAGE. Beaten characters: bits in 0xFF8110.
+- STAGE screen (0x7F50): opponent = order[0xFF8112]; written to the CPU at 0x7FB6
+  (fp/a4 = CPU, a0 = human). Player struct +0x9E set = played by the CPU.
+- Dan as CPU (single player): 0xBDC6 sets 0xFF813E = 2: Akuma's ambush. Dan is
+  never fought; an intruder object (0x27C54) runs in, taunts and is beaten, its
+  animations from Dan's table 0x7AB6C (states 9, 4, 7), moved by code.
+- X": Felicia moved to place 7 for Zangief (xp_zstage, xp_zorder); Zangief as the
+  CPU in Dan's place one time in two (xp_zcpu, xp_zcpu2), and then in the ambush
+  (xp_zintr, his intruder table at ZBLOB + 0xA0).
+- CONTINUE screen: a fighter-sized figure, base = state table of fp+3, state 0-5
+  by danger level (0x243D8): hooked (xp_zcont).
+- Ending (NORMAL): staff roll with the player's picture, 0x23C84 (character from
+  0xFF8130, dimmed: d6 = 0xC000C000): Zangief's ZCRED (0.85, centred). The scenes
+  between the credits are the same for everybody.
+- The random routine 0x2DB02 only moves when called: tests from a saved state need
+  a different seed (0xFF80AE) each time.
+
+## Test harness notes
+
+- `tools/cps2emu.py`: breakpoints and watchpoints log registers only; the log's
+  pc for a write is the writer (sprite list owners: a6 = the object).
+- Making the CPU lose: fill its board's drop column (P2 board 0xFFAD10, 13 rows of
+  16 bytes, cells are words, column offset 8) with alternating colours.
+- Sound: see `docs/QSOUND.md`.
