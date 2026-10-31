@@ -74,3 +74,19 @@ then the X" patches in `arcade/src`. These notes record what is known about the
 - Sprite frame (emitter 0x14C64): word sprites, word count-1, word position list
   offset into the pointer table 0x2DB1C, then count longs (attr << 16 | code); the
   position list gives x, y per sprite.
+
+## Pocket Fighter arcade (sgemf), for Zangief
+
+- Program `pcfu.03` + `pcf.04`-`pcf.07` (2.5 MB), encrypted up to 0x100000 with
+  `sgemf.key`; `tools/cps2crypt.py` decrypts it. Graphics: 20 MB.
+- Same engine family as SPF2T: the same sprite emitters (0x1D5CA..., variant with the
+  position list pointer inline: word sprites, word count-1, long positions, then
+  count longs attr << 16 | code; y is or-ed with the object's +0x3E tile bank).
+- Player objects in a match: P1 0xFF8400, P2 0xFF8800; character at +0x381
+  (Zangief = 9), animation entry at +0x1C.
+- Player animations: 0x10E0A, base = one of three per-character tables (13 longs):
+  0x72B10, 0x72B44, 0x72B78; Zangief's bases 0x1A1F2A, 0x1A355A, 0x1A6F54 (his data
+  0x1A1F2A-0x1AF8AE). Entry = base + word[base + 2*id]; entries are 24 bytes
+  (+0 duration and flags, +4 sprite frame).
+- Select screen grid: Ryu Ken / Chun-Li Sakura Morrigan Hsien-Ko / Felicia Tessa
+  Zangief Ibuki (Akuma right of Ryu). Default coinage 2 coins a credit.
