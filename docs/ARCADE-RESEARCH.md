@@ -90,3 +90,35 @@ then the X" patches in `arcade/src`. These notes record what is known about the
   (+0 duration and flags, +4 sprite frame).
 - Select screen grid: Ryu Ken / Chun-Li Sakura Morrigan Hsien-Ko / Felicia Tessa
   Zangief Ibuki (Akuma right of Ryu). Default coinage 2 coins a credit.
+
+## Zangief in the match (done)
+
+- `tools/arcade_zangief.py`: the arcade PF keeps Zangief's animation entries in
+  the PSX order (entry k of PL09A.MDL = k-th arcade entry from 0x1A1FC6, skipping
+  the two state tables in between), so the PSX choice of animations carries over.
+  Frames come composited (costumes included); scale 0.9, one 15-colour palette,
+  1394 tiles at sprite codes 0x8000- (graphics 0xC00000-, four new ROMs
+  pzfen.13m/15m/17m/19m). Blob at 0x90000: state offsets (63 words, 0 = Dan's),
+  palette at +0x80, position lists, frames (type 12), entries.
+- The game reads its jump tables pc-relative, i.e. through the decryption:
+  hooks that need them keep copies (state tables 0x143F6, frame types 0x14BE2).
+- Palette: Dan's sprite palette slot (P1 12, P2 16 = 12 + the object's +0x0D)
+  overwritten every frame while Zangief's animation runs (sprite list hook).
+- HUD name: scroll1 lists at 0x84560 (16 bytes per char*2+side, +4 list: word,
+  word, columns-1, then top code/attr, bottom code/attr per column). ZANGIEF is
+  composed by `tools/cps2label.py` (PSX method), lists at 0x9F000 / 0x9F080,
+  hook 0x16C78. The labels use the PSX pixel coordinates in other colours
+  (outline 8/D/C/B by row, F transparent, 0 shadow).
+- Zangief bit: 0xFF3010 (bit 0 P1, bit 1 P2). Not set by the select screen yet.
+
+## Select screen (to do)
+
+- Scroll2 (base 0x904000, 16x16): the grid is ONE 12x6-tile picture (rows 8-13,
+  columns 6-17, codes 0x7070-0x70B7); the PLAYER SELECT logo is 8x4 tiles (rows 3-6,
+  columns 8-15). Screen y = row * 16 - 16. Free: rows 1-2 above the logo, row 7.
+- Scroll2 codes reach the new graphics (0xC00000-) like sprites do.
+- Cursor movement: 0x789E (KScl's tables: offsets 0x3F800, navigation 0x3F840,
+  8 columns x 5 rows of characters, FF = none; start positions per character
+  0x3F880). Row 0 is free for the new icon row; row 3 holds Devilot, Akuma, Dan.
+- Select names: 0x79B0 copies the character's name tiles into scroll1 0x90212C
+  (P1) / 0x90302C (P2), from the 0x84560 table (+0x0C variant).
