@@ -4,8 +4,11 @@
 | routine at 0xBA44, 0xFF8100 = stage * 2). Now P1 chooses it on the select
 | screen with START, until he confirms his character; the line between the
 | PLAYER SELECT logo and the grid shows the setting:
-|   RANDOM (default), NORMAL (vanilla), MORRIGAN .. AKUMA, then RANDOM again.
+|   RANDOM (default), NORMAL (vanilla), MORRIGAN .. AKUMA, ZANGIEF (the
+|   castle, code_castle.s), then RANDOM again.
 | RANDOM draws a stage at every match, never the one of the previous match.
+| XP_CASTLE tells code_castle.s that stage 20 (Dan's) is the castle: ZANGIEF,
+| RANDOM's 11th stage, or the stage of a Zangief player (NORMAL, VS COM).
 | The setting lives until the title screen comes back. VS COM is not touched.
 |
 | Code in pzf.04 (0x80000-, outside the encrypted range): it goes in as it is.
@@ -17,8 +20,10 @@
 .set XP_LAST,    0xFF3001           | byte: last stage RANDOM gave (0xFF none)
 .set XP_START,   0xFF3002           | byte: START held last frame
 .set XP_TICK,    0xFF3003           | byte: runs every select frame (RANDOM's seed)
-.set N_SET,      12                 | RANDOM, NORMAL, 10 stages
-.set N_STAGES,   10
+.set N_SET,      13                 | RANDOM, NORMAL, 10 stages, ZANGIEF
+.set N_STAGES,   11                 | 10 characters' stages and the castle
+.set CASTLE,     10                 | stage number of the castle (Dan's stage 10 + XP_CASTLE)
+.set XP_CASTLE,  0xFF3005           | byte (code_castle.s)
 .set XP_SHOW,    0xFF3004           | byte: frames the line stays on (set by the select hook)
 .set LINE_X,     152 + 64           | sprite coordinates of the first character
 .set LINE_Y,     207 + 16           | under the grid (the icon row took the space under the logo)
@@ -133,30 +138,31 @@ rts
 
 xp_title:
 clr.b  XP_STAGE
+clr.b  XP_CASTLE
 move.b #0xFF, XP_LAST
 lea    0x3F900, %a0                 | 'X" BALANCE PATCH BY ZANAC'
 lea    0x900670, %a1                | column 12 (25 characters, centred)
 rts
 
-| d1 = stage (a1 = the player whose character gives it in vanilla)
+| d1 = stage (a1 = the player whose character gives it in vanilla); XP_CASTLE
 xp_stage:
+clr.b  XP_CASTLE
 moveq  #0, %d1
 move.b 0x82(%a1), %d1
 cmpi.b #3, A5 + 0xAC                | two players
-bne.b  st_out
+bne.b  st_nat
 tst.b  A5 + 0xE0                    | VS HUMAN, not an arcade challenge
-beq.b  st_out
+beq.b  st_nat
 move.l %d0, -(%sp)
 moveq  #0, %d0
 move.b XP_STAGE, %d0
 cmpi.b #N_SET, %d0
 bcc.b  st_random                    | never set: RANDOM
 subq.b #1, %d0
-beq.b  st_done                      | NORMAL
+beq.b  st_normal                    | NORMAL
 bcs.b  st_random
-subq.b #1, %d0
-move.b %d0, %d1                     | a fixed stage
-bra.b  st_done
+subq.b #1, %d0                      | a fixed stage
+bra.b  st_pick
 st_random:
 moveq  #0, %d0
 move.b XP_TICK, %d0
@@ -170,9 +176,25 @@ bcs.b  st_new
 moveq  #0, %d0
 st_new:
 move.b %d0, XP_LAST
+st_pick:
 move.b %d0, %d1
+cmpi.b #CASTLE, %d0
+bne.b  st_done
+move.b #1, XP_CASTLE
 st_done:
 move.l (%sp)+, %d0
+rts
+st_normal:
+move.l (%sp)+, %d0
+st_nat:                             | the character's stage: Zangief's is the castle
+cmpi.b #10, %d1
+bne.b  st_out
+move.l %a0, -(%sp)
+movea.l %a1, %a0
+jsr    xp_zis_ok                    | code_zangief.s (Z: not Zangief)
+movea.l (%sp)+, %a0
+beq.b  st_out
+move.b #1, XP_CASTLE
 st_out:
 rts
 
@@ -190,4 +212,5 @@ xp_names:
 .ascii "< SAKURA >"
 .ascii "<DEVILOT >"
 .ascii "< AKUMA  >"
+.ascii "<ZANGIEF >"
 .even

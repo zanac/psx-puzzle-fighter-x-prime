@@ -183,6 +183,46 @@ then the X" patches in `arcade/src`. These notes record what is known about the
 - The random routine 0x2DB02 only moves when called: tests from a saved state need
   a different seed (0xFF80AE) each time.
 
+## Stages
+
+- Stage value 0xFF8100 = 2 * stage (0-20 the characters' stages, Dan 20; 22 is
+  a special one). Set up by 0x20D78 (palettes), 0x1788C (layers), 0x1674E
+  (stage objects); per frame 0x178A8 and 0x16A3A. The test menu's stage viewer
+  (0x1C292) cycles 0-20.
+- Layers: scroll2 (0x904000) holds the stage picture *and* the wells' frames,
+  scroll3 (0x908000) the far background, the stage's animated things are
+  sprites (objects from 0x16792). Layer control per stage at 0x178FC
+  (0xFF8032, written to 0x800166 by 0x13C8; 0xFF812A set stops the write).
+- Scroll2: 0x17AAE fills the 16 blocks (4x4 of 256x256) from the list 0x17D08
+  + word[0x17D08 + stage]; block n = 256 cells at 0xC5880 + n * 0x400, code +
+  0x5800 (blocks used: up to 0x86; 0xE7C80- is free, = block 0x89). Scroll3:
+  0x17BD4, list 0x17DCE, 64 blocks of 64 cells at 0xE1080 + n * 0x100, code +
+  0x1CC0.
+- The camera: screen (0, 0) is scroll2 map (0x200, 0x310) in a match
+  (0xFF810D = 1; 0 on the VS screen, 3 on WINNER: other parts of the map). Each
+  screen's picture is a 24x6 cell band (rows 5-10 of a block pair); in the
+  match the cells over the wells (columns 1-6 and 17-22) use palettes 16-30,
+  darker copies of 0-14; 15 and 31 are the frames.
+- Palettes: scroll2 0xA22C0 + stage * 0x200 (0x400 a stage, 32 palettes;
+  loaders 0x20D06, 0x20ECC, 0x20FCE), scroll3 0xA5AC0, stage sprites 0xA0D40 +
+  stage * 64.
+- Music: 0x2BBF0, song = 1 + stage / 2 (pc-relative table 0x2BC12), played
+  through 0x2B294.
+- Scroll2 tile code c is graphics tile 0x10000 + c (16x16 units, the CPS2
+  bank), the same mapping as sprites: the new ROMs (0xC00000-) are codes 0x8000-.
+
+Zangief's stage (code_castle.s, tools/cps2castle.py): Pocket Fighter's castle
+as on the PSX, built from the user's sgemf set. It is Dan's stage with its
+own blocks (Dan's, band cells replaced), palette block, no stage objects and
+song 24. Shown when the stage is 20 and XP_CASTLE is set (selector ZANGIEF,
+RANDOM's 11th stage, or NORMAL / a challenge where the stage's player is
+Zangief). In Arcade the CPU Zangief only comes in Akuma's ambush, on Akuma's
+stage, so the castle is a Versus stage.
+
+Pocket Fighter's castle (stage value 12): scroll3 sky and moon, scroll1
+floating castle (8x8 tiles through 32x32 metatiles), scroll2 statue, steps and
+wagon; lists, block libraries and palettes in `tools/cps2castle.py`.
+
 ## Test harness notes
 
 - `tools/cps2emu.py`: breakpoints and watchpoints log registers only; the log's

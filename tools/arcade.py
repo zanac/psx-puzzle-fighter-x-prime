@@ -9,7 +9,7 @@ byte of game data is taken from your sets."""
 import sys, os, zipfile, zlib, tempfile, struct
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import cps2crypt, cps2patch, cps2gfx, cps2preview, cps2label, cps2icons, cps2names, cps2quotes, pfarc, arcade_zangief, qsconv
+import cps2crypt, cps2patch, cps2gfx, cps2preview, cps2label, cps2icons, cps2names, cps2quotes, cps2castle, pfarc, arcade_zangief, qsconv
 
 HERE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 XP = os.path.join(HERE, 'arcade', 'xprime')
@@ -185,9 +185,13 @@ def build(spf2t, sgemf, out, verbose=True):
     ci, cp = cps2icons.zangief_winner(pfgfx2, pfprog, cps2icons.CRED_SCALE)
     cred = picture(ZCRED, ci, cp, -(ci.shape[1] // 2), -(ci.shape[0] // 2), ztiles)
     quotes, _ = cps2quotes.build(pfprog)
+    # his stage: Pocket Fighter's castle in place of Dan's stage (code_castle.s)
+    castle, ctiles, _ = cps2castle.build(swap(p03) + swap(p04), pfprog, pfgfx2,
+                                         arcade_zangief.TILE0 + len(ztiles))
+    ztiles += ctiles
     vtab = struct.pack('>32H', *[ZVOICES.get(o, ZVOICES[2])[1] for o in range(32)])
     p04 = cps2patch.put(p04, 0x80000, [(ZVOICE_TAB, vtab), (arcade_zangief.ZBLOB, zblob), (ZICONS, icons), (ZSELNAME, selname), (ZPORT, port), (ZWIN, win), (ZCRED, cred),
-                                       (cps2quotes.ZQUOTES, quotes)])
+                                       (cps2quotes.ZQUOTES, quotes)] + castle)
     files = {'pzfen.03': p03, 'pzfen.04': p04}
     for g, data in zip(('13m', '15m', '17m', '19m'), arcade_zangief.gfx_roms(ztiles)):
         files['pzfen.' + g] = data
