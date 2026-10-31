@@ -113,7 +113,7 @@ def build(spf2t, sgemf, out, verbose=True):
                                (0x1000000, [s['pcf.14m'], s['pcf.16m'], s['pcf.18m'], s['pcf.20m']])])
     zblob, ztiles = arcade_zangief.build(pfprog, pfgfx, verbose)
     # the new select icons: tiles after his, codes and palettes at ZICONS
-    zi, zp = cps2icons.zangief(pfgfx, pfprog)
+    zi, zp = cps2icons.zangief(pfgfx, pfprog, cps2gfx.Gfx(gfx))
     pfgfx2 = pfgfx
     di, dp = cps2icons.dan(cps2gfx.Gfx(gfx), swap(p03) + swap(p04))
     codes = []

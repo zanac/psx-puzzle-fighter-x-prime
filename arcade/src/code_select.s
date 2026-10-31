@@ -9,6 +9,8 @@
 .set ZICONS,     0x9F100            | 2 palettes (16 words each), then 9 + 9 tile codes
 .set XP_ZBITS,   0xFF3010
 .set S2,         0x904000
+.set S1,         0x900000
+.set PANEL_PAL,  3                  | scroll1 palette of the grid's panels
 .set S2PAL,      0x90C800           | scroll2 palettes
 .set ICON_PAL0,  8
 .set CUR1,       0xFF0C82           | +1 position (P1); P2 at +4
@@ -114,6 +116,7 @@ clr.b  XP_ZBITS                     | the choosing players set theirs
 | scroll2 cell (column c, row r) = S2 + 4 * ((r & 15) + 16 * c + 64 * (r & 0x30))
 xp_icons:
 movem.l %d0-%d3/%a0-%a2, -(%sp)
+bsr.b  xp_panels
 lea    ZICONS + 64, %a0             | tile codes
 lea    S2 + 4 * (5 + 16 * 9), %a1   | Zangief: columns 9-11, rows 5-7
 moveq  #ICON_PAL0, %d2
@@ -141,6 +144,48 @@ lea    0x40(%a2), %a2               | next column
 dbf    %d1, ic_col
 addq.l #4, %a1                      | next row
 dbf    %d0, ic_row
+rts
+
+| the grid's panels (scroll1, under scroll2) behind the two icons: 6x6 tiles,
+| scroll1 rows 42-47 (scroll2 rows 5-7), columns 18-23 and 24-29.
+| scroll1 cell (column c, row r >= 32) = S1 + 4 * ((r & 31) + 32 * c + 0x800)
+xp_panels:
+lea    S1 + 4 * (10 + 32 * 18 + 0x800), %a1
+moveq  #1, %d3
+pn_panel:
+moveq  #0, %d0                      | row
+pn_row:
+move.w #0x783, %d2                  | middle rows
+tst.w  %d0
+bne.b  pn_nt
+move.w #0x780, %d2                  | top
+pn_nt:
+cmpi.w #5, %d0
+bne.b  pn_nb
+move.w #0x786, %d2                  | bottom
+pn_nb:
+move.w %d0, %d1
+add.w  %d1, %d1
+add.w  %d1, %d1
+lea    0(%a1, %d1.w), %a2
+move.w %d2, (%a2)                   | left edge
+move.w #PANEL_PAL, 2(%a2)
+addq.w #1, %d2
+moveq  #3, %d1
+pn_mid:
+lea    0x80(%a2), %a2               | next column
+move.w %d2, (%a2)
+move.w #PANEL_PAL, 2(%a2)
+dbf    %d1, pn_mid
+addq.w #1, %d2
+lea    0x80(%a2), %a2
+move.w %d2, (%a2)                   | right edge
+move.w #PANEL_PAL, 2(%a2)
+addq.w #1, %d0
+cmpi.w #6, %d0
+bne.b  pn_row
+lea    6 * 0x80(%a1), %a1           | the next panel
+dbf    %d3, pn_panel
 rts
 
 xp_curxy:

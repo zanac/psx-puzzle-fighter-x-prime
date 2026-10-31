@@ -5,7 +5,10 @@ grid's (one scroll2 picture of 4x2 icons, each 3x3 16x16 tiles, one palette each
   without its frame, resized to 48x48.
 - Dan: his SPF2T select portrait (sprite frame 0x7FF38, palettes 0xAABC0..),
   face and fist cropped and scaled down.
-Both get the grid icons' rounded corners and one 15-colour palette."""
+Like the grid's, the pictures fill only the blue inside of the panel under
+them (scroll1 tiles 0x780-0x788, 6x6 8x8 tiles, drawn by code_select.s):
+42x42 pixels at (3, 3), transparent where the panel is not blue. One
+15-colour palette each."""
 import struct
 import numpy as np
 
@@ -14,20 +17,28 @@ ZG_ICON_PAL = 0x198F6
 DAN_PORTRAIT = 0x7FF38      # SPF2T frame (P1 select portrait)
 DAN_PALS = {0: 0xAABC0, 1: 0xAABE0, 2: 0xAAC00}
 DAN_CROP = (20, 0, 100, 80)  # in the portrait (128x112), then to 48x48
-CORNER = 5                   # radius of the rounded corners
+PANEL = [[0x780, 0x781, 0x781, 0x781, 0x781, 0x782]] + \
+        [[0x783, 0x784, 0x784, 0x784, 0x784, 0x785]] * 4 + \
+        [[0x786, 0x787, 0x787, 0x787, 0x787, 0x788]]
+PANEL_IN = 5                 # the panel's blue pen
+IN0, IN = 3, 42              # the inside: 42x42 from (3, 3)
 
 def rgb_of(words):
     return np.array([[((w >> 8) & 15) * 17, ((w >> 4) & 15) * 17, (w & 15) * 17] for w in words], np.uint8)
 
-def corner_mask():
-    m = np.ones((48, 48), bool)
-    r = CORNER
-    for y in range(r):
-        for x in range(r):
-            if (r - x - 0.5) ** 2 + (r - y - 0.5) ** 2 > r * r:
-                for yy, xx in ((y, x), (y, 47 - x), (47 - y, x), (47 - y, 47 - x)):
-                    m[yy, xx] = False
-    return m
+def panel_mask(spfgfx):
+    """48x48: True where the panel is blue (scroll1 8x8 tile c = right half of
+    the 16x16 tile c // 2, rows (c % 2) * 8)"""
+    P = np.zeros((48, 48), np.uint8)
+    for r, row in enumerate(PANEL):
+        for c, code in enumerate(row):
+            P[r * 8:r * 8 + 8, c * 8:c * 8 + 8] = spfgfx.tile(code // 2)[(code % 2) * 8:(code % 2) * 8 + 8, 8:16]
+    return P == PANEL_IN
+
+def place(rgb42, mask):
+    out = np.zeros((48, 48, 3), np.uint8)
+    out[IN0:IN0 + IN, IN0:IN0 + IN] = rgb42
+    return quantise(out, mask)
 
 def quantise(rgb, mask):
     from PIL import Image
@@ -41,16 +52,13 @@ def quantise(rgb, mask):
     words = [0xF000 | ((r >> 4) << 8) | ((g >> 4) << 4) | (b >> 4) for r, g, b in pal.tolist()] + [0xF000]
     return idx, words
 
-def zangief(pfgfx, pfprog):
-    from PIL import Image
+def zangief(pfgfx, pfprog, spfgfx):
     im = np.zeros((48, 48), np.uint8)
     for by in range(3):
         for bx in range(3):
             im[by * 16:by * 16 + 16, bx * 16:bx * 16 + 16] = pfgfx.tile(ZG_ICON + bx + by * 16)
     pal = rgb_of(struct.unpack('>16H', pfprog[ZG_ICON_PAL:ZG_ICON_PAL + 32]))
-    inner = pal[im[3:45, 3:45]]                          # without PF's frame
-    big = np.array(Image.fromarray(inner).resize((48, 48), Image.LANCZOS))
-    return quantise(big, corner_mask())
+    return place(pal[im[3:45, 3:45]], panel_mask(spfgfx))   # PF's inside, 1:1
 
 def dan(spfgfx, spfprog):
     import pfarc
@@ -65,8 +73,7 @@ def dan(spfgfx, spfprog):
         out[m] = rgb_of(struct.unpack('>16H', spfprog[a:a + 32]))[img[m]]
     a, b, c, d = DAN_CROP
     crop = out[y0 + b:y0 + d, x0 + a:x0 + c]
-    big = np.array(Image.fromarray(crop).resize((48, 48), Image.LANCZOS))
-    return quantise(big, corner_mask())
+    return place(np.array(Image.fromarray(crop).resize((IN, IN), Image.LANCZOS)), panel_mask(spfgfx))
 
 def tiles_of(idx):
     return [idx[by * 16:by * 16 + 16, bx * 16:bx * 16 + 16].copy() for by in range(3) for bx in range(3)]
