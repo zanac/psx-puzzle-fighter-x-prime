@@ -99,3 +99,25 @@ How Zangief's voices are wired, so a sample can be swapped quickly. Change `VOIC
 Free today: 19, 20, 22, 25, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56 (01–03 are effects).
 
 To listen: `python3 tools/zangief.py voices SE0AA.PAC SE_PL0A.EMI out.EMI --wav DIR` writes every Zangief and Dan sample as WAV (from your own discs).
+
+## Arcade (spf2enh)
+
+The arcade plays only 8 of Dan's voices (offsets 2-7, 15, 20 of his id 0x250 +
+offset; offset n = PSX slot n + 1). `ZVOICES` in `tools/arcade.py` maps them to
+Pocket Fighter's arcade voices (song ids of instrument bank 7), the same choices
+as the PSX where an arcade take of the VAG exists:
+
+| Dan offset | PSX slot | Zangief voice | PF arcade id (bank 7 #) |
+|---|---|---|---|
+| 2 | 3 | 05 punch | 0x1C7 (#37) |
+| 3 | 4 | 28 arms-up move | 0x1F2 (#7) |
+| 4 | 5 | 26 special moves | 0x1ED (#23) |
+| 5 | 6 | 13 | 0x1DB (#33) |
+| 6 | 7 | 10 has no arcade take: 11 | 0x1D8 (#0) |
+| 7 | 8 | 21 taunt | 0x1E6 (#20) |
+| 15 | 16 | 06 has no arcade take: 07 | 0x1CC (#45) |
+| 20 | 19 | 23 Double Lariat | 0x1E8 (#49) |
+
+PSX VAG -> PF arcade bank 7 instrument, matched on the waveforms: 04 #43, 05 #37,
+07 #45, 08 #5, 09 #30, 11 #0, 13 #33, 14 #32, 15 #25, 16 #6, 17 #27, 18 #35,
+21 #20, 23 #49, 24 #47, 26 #23, 27 #10, 28 #7, 30 #13. See docs/QSOUND.md.

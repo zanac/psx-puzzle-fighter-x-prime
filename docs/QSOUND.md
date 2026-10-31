@@ -112,3 +112,29 @@ Zangief) is song 7.
 
 Results for the castle song: identical spectral peaks, constant lag over 45 s, RMS
 ~2300 against SPF2T's music 2100-3100, no clipping.
+
+## Voices
+
+- SPF2T plays a character's voice through 0x2BE50: id = base[character]
+  (0x2BE7E: Morrigan 0x120, Chun-Li 0x140, Ryu 0x160, Ken 0x180, Hsien-Ko 0x1A0,
+  Donovan 0x1C0, Felicia 0x1E0, Sakura 0x200, Devilot 0x220, Akuma 0x240, Dan
+  0x250) + offset, + 0x200 for P2. The offset comes from the attack voice table
+  0x14496 (character * 64 + category (+0xDB) * 8 + variant (+0xD8)); Dan uses
+  offsets 2-7, 15, 20. fp there is the player struct.
+- A voice is a song with flags 0x10 and one track: channel 10 for P1, 11 for P2
+  (the two songs are otherwise the same).
+- Pocket Fighter: Zangief's voices are the songs that play instrument bank 7
+  (ids 0x1C6-0x1F7..., one track, track 12).
+- Matching the PSX choices (docs/ZANGIEF-VOICES.md): Dan's arcade offset n is
+  his PSX voice slot n + 1 (cross-correlation of the PSX VAGs, decoded, with the
+  arcade samples, at a fixed 1.08 length ratio); PF's PSX VAGs match PF's arcade
+  bank 7 instruments at 1.5 (correlation 0.84-0.998 for 19 of the 31; VAGs 6,
+  10, 12, 29 and 31 have no arcade take).
+- `tools/arcade.py` ZVOICES: Dan's offset -> (PF voice id, SPF2T slot s); each
+  voice is converted twice (slot s on channel 10, s + 0x200 on channel 11, flags
+  0x10, velocity 63 as Dan's) and code_voice.s (hook 0x2BE5E) plays s for
+  Zangief. Free slot pairs used: 0x13C-0x13F, 0x199-0x19C (above the highest
+  offset Morrigan and Ken use).
+- Checked: the converted voices last exactly as PF's and are as loud as Dan's
+  (RMS 3300-6000, peaks ~17000); in a match P1 Zangief plays 0x13C..., P2
+  0x33C..., Dan keeps 0x25x / 0x45x.

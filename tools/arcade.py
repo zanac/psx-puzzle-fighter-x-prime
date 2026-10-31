@@ -56,6 +56,21 @@ ZSELNAME = 0x9F700          # his select screen name: pseudo entry, frame, posit
 ZPORT = 0x9F800             # his select portrait: pseudo entry, palette, positions, frame (code_select.s)
 ZWIN = 0x9D000              # his WINNER screen picture, same layout (code_quotes.s)
 SONGS = [(7, 24)]           # Pocket Fighter song -> SPF2T song slot: 7 the castle stage's music
+# Zangief's voices: Dan's offset (id = 0x250 + offset) -> (Pocket Fighter voice
+# id, SPF2T slot s; P2 plays s + 0x200 on channel 11). Dan's arcade offset n is
+# his PSX voice slot n + 1 (checked on the waveforms), so the PSX choice
+# (docs/ZANGIEF-VOICES.md) carries over; PF voice ids play bank 7 instruments,
+# matched to the PSX VAGs on the waveforms too (docs/QSOUND.md).
+ZVOICES = {2: (0x1C7, 0x13C),    # PSX slot 3 -> VAG 05 punch (bank 7 #37)
+           3: (0x1F2, 0x13D),    # slot 4 -> VAG 28 arms-up move (#7)
+           4: (0x1ED, 0x13E),    # slot 5 -> VAG 26 special moves (#23)
+           5: (0x1DB, 0x13F),    # slot 6 -> VAG 13 (#33)
+           6: (0x1D8, 0x199),    # slot 7 -> VAG 10 has no arcade take: VAG 11 (#0)
+           7: (0x1E6, 0x19A),    # slot 8 -> VAG 21 taunt (#20)
+           15: (0x1CC, 0x19B),   # slot 16 -> VAG 06 has no arcade take: VAG 07 (#45)
+           20: (0x1E8, 0x19C)}   # slot 19 -> VAG 23 Double Lariat (#49)
+ZVOICE_TAB = 0x9E300        # 32 words: his P1 id by Dan's offset (code_voice.s)
+VOICE_VELOCITY = 0x3F       # as Dan's voices
 VELOCITY = 26                # note velocity of the converted songs: as loud as SPF2T's own music
 QROM_SIZE = 0x400000        # pzfen.13s, QSound 0x400000- (code banks 0x40-)
 ZCRED = 0x9C000             # his staff roll picture (code_quotes.s)
@@ -170,7 +185,8 @@ def build(spf2t, sgemf, out, verbose=True):
     ci, cp = cps2icons.zangief_winner(pfgfx2, pfprog, cps2icons.CRED_SCALE)
     cred = picture(ZCRED, ci, cp, -(ci.shape[1] // 2), -(ci.shape[0] // 2), ztiles)
     quotes, _ = cps2quotes.build(pfprog)
-    p04 = cps2patch.put(p04, 0x80000, [(arcade_zangief.ZBLOB, zblob), (ZICONS, icons), (ZSELNAME, selname), (ZPORT, port), (ZWIN, win), (ZCRED, cred),
+    vtab = struct.pack('>32H', *[ZVOICES.get(o, ZVOICES[2])[1] for o in range(32)])
+    p04 = cps2patch.put(p04, 0x80000, [(ZVOICE_TAB, vtab), (arcade_zangief.ZBLOB, zblob), (ZICONS, icons), (ZSELNAME, selname), (ZPORT, port), (ZWIN, win), (ZCRED, cred),
                                        (cps2quotes.ZQUOTES, quotes)])
     files = {'pzfen.03': p03, 'pzfen.04': p04}
     for g, data in zip(('13m', '15m', '17m', '19m'), arcade_zangief.gfx_roms(ztiles)):
@@ -179,8 +195,12 @@ def build(spf2t, sgemf, out, verbose=True):
         files['pzfen.' + g] = data
     # sound: Pocket Fighter's castle music (and Zangief's voices) converted to
     # SPF2T's driver: a new Z80 program and a new sample ROM
+    songs = list(SONGS)
+    for off, (pf_id, slot) in ZVOICES.items():
+        for ch, sl in ((10, slot), (11, slot + 0x200)):
+            songs.append((pf_id, sl, dict(channel=ch, flags=0x10, velocity=VOICE_VELOCITY)))
     z80, q, info = qsconv.convert(s['pcf.01'] + s['pcf.02'], s['pcf.11m'] + s['pcf.12m'],
-                                  r['pzf.01'] + r['pzf.02'], r['pzf.11m'] + r['pzf.12m'], SONGS, VELOCITY)
+                                  r['pzf.01'] + r['pzf.02'], r['pzf.11m'] + r['pzf.12m'], songs, VELOCITY)
     if verbose: print('sound:', info)
     files['pzfen.01'], files['pzfen.02'] = z80[:0x20000], z80[0x20000:]
     files['pzfen.13s'] = q + bytes(QROM_SIZE - len(q))

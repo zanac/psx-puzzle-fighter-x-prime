@@ -199,11 +199,16 @@ def v2_track(ev, end, loop_t, ins_map, velocity, bank):
     return bytes(out)
 
 def convert(pf_z80, pf_q, spf_z80, spf_q, songs, velocity=0x3F):
-    """songs: [(pf song number, spf slot)] -> (new spf_z80, extra QSound ROM)"""
+    """songs: [(pf song number, spf slot)] or [(pf song, spf slot, options)];
+    options: 'channel' (all of the song's tracks on that one channel: SPF2T's
+    voices play on 10 (P1) / 11 (P2)), 'flags' (the song's flags byte: 0x10 for
+    a voice), 'velocity'. -> (new spf_z80, extra QSound ROM, info)"""
     z = bytearray(spf_z80)
-    used_ins = {}          # (pf bank, prog) -> new instrument index
+    used_ins = {}          # (pf bank, prog, detune) -> new instrument index
     tracks_of = {}
-    for k, slot in songs:
+    for item in songs:
+        k, slot = item[:2]
+        opt = item[2] if len(item) > 2 else {}
         p = pf_song(pf_z80, k)
         trs = []
         for i in range(16):
@@ -219,7 +224,11 @@ def convert(pf_z80, pf_q, spf_z80, spf_q, songs, velocity=0x3F):
                 if e[2] in ('prog', 'bend') and prog is not None:
                     used_ins.setdefault(prog + (detune,), len(used_ins))
             trs.append((ev, end, loop_t))
-        tracks_of[(k, slot)] = (pf_z80[p], trs)
+        if 'channel' in opt:
+            one = [t for t in trs if t is not None]
+            if len(one) != 1: raise ValueError('song %x: %d tracks for one channel' % (k, len(one)))
+            trs = [None] * 16; trs[opt['channel']] = one[0]
+        tracks_of[(k, slot)] = (opt.get('flags', pf_z80[p]), trs, opt.get('velocity', velocity))
     # samples: PF banks copied whole into new QSound banks
     qbank = {}; new_samp = []
     ins_bytes = bytearray()
@@ -252,12 +261,12 @@ def convert(pf_z80, pf_q, spf_z80, spf_q, songs, velocity=0x3F):
     for i, s in enumerate(new_samp): z[sa + 8 * i:sa + 8 * i + 8] = s
     # songs
     at = NEW_SEQ_SPACE[0]
-    for (k, slot), (flags, trs) in tracks_of.items():
+    for (k, slot), (flags, trs, vel) in tracks_of.items():
         if b32(z, SPF_SEQ + 4 * slot): raise ValueError('song slot %d is used' % slot)
         body = []; offs = []; o = 1 + 32
         for tr in trs:
             if tr is None: offs.append(0); continue
-            b = v2_track(*tr, used_ins, velocity, NEW_BANK)
+            b = v2_track(*tr, used_ins, vel, NEW_BANK)
             offs.append(o); body.append(b); o += len(b)
         seq = bytes([flags]) + struct.pack('>16H', *offs) + b''.join(body)
         if at + len(seq) > NEW_SEQ_SPACE[1]: raise ValueError('no room for the songs')
